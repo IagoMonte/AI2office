@@ -9,7 +9,17 @@ export function addMessage(role, content) {
   const div = document.createElement("div");
   div.className = "message " + role;
   if (role === "assistant") {
-    div.innerHTML = renderMarkdown(content);
+    let html = null;
+    try {
+      html = renderMarkdown(content);
+    } catch {
+      html = null;
+    }
+    if (html) {
+      div.innerHTML = html;
+    } else {
+      div.textContent = content;
+    }
   } else {
     div.textContent = content;
   }
@@ -41,13 +51,14 @@ let currentToolGroup = null;
 
 function buildToolGroup(container) {
   const group = document.createElement("div");
-  group.className = "tool-group";
+  group.className = "tool-group open";
 
   const toggle = document.createElement("button");
   toggle.type = "button";
   toggle.className = "tool-toggle";
   toggle.innerHTML =
-    TOOL_GROUP_SVG + '<span>Uso de ferramentas <span class="tool-count">(0)</span></span>';
+    TOOL_GROUP_SVG +
+    '<span>Uso de ferramentas <span class="tool-count">(0)</span><span class="tool-running"></span></span>';
   toggle.addEventListener("click", () => {
     group.classList.toggle("open");
   });
@@ -68,12 +79,22 @@ function buildToolGroup(container) {
   return group;
 }
 
+function setRunningLabel(fnName) {
+  if (!currentToolGroup) return;
+  const el = currentToolGroup.querySelector(".tool-running");
+  if (el) {
+    el.textContent = " · executando " + fnName + "...";
+  }
+}
+
 export function beginToolActivity(fnName, fnArgs) {
   const container = document.getElementById("chatMessages");
 
   if (!currentToolGroup || currentToolGroup.parentNode !== container) {
     currentToolGroup = buildToolGroup(container);
   }
+  currentToolGroup.classList.add("open");
+  setRunningLabel(fnName);
 
   const entry = document.createElement("div");
   entry.className = "tool-entry running";
@@ -102,6 +123,8 @@ export function completeToolActivity(entry, fnName, result) {
   if (group) {
     const count = group.querySelector(".tool-count");
     if (count) count.textContent = "(" + group.querySelectorAll(".tool-entry").length + ")";
+    const running = group.querySelector(".tool-running");
+    if (running) running.textContent = "";
   }
 
   const container = document.getElementById("chatMessages");
@@ -113,11 +136,48 @@ export function resetToolActivity() {
 }
 
 export function collapseToolActivity() {
-  if (currentToolGroup) currentToolGroup.classList.remove("open");
+  if (currentToolGroup) {
+    currentToolGroup.classList.remove("open");
+    const running = currentToolGroup.querySelector(".tool-running");
+    if (running) running.textContent = "";
+  }
 }
 
 export function updateSendButton() {
   const input = document.getElementById("chatInput");
   const btn = document.getElementById("sendBtn");
   btn.disabled = !input.value.trim() || isBusy();
+}
+
+export function renderAttachmentChips(attachments) {
+  const container = document.getElementById("attachmentChips");
+  if (!container) return;
+
+  container.innerHTML = "";
+  if (!attachments.length) {
+    container.classList.add("hidden");
+    return;
+  }
+  container.classList.remove("hidden");
+
+  attachments.forEach((attachment, index) => {
+    const chip = document.createElement("span");
+    chip.className = "chip" + (attachment.truncated ? " truncated" : "");
+    chip.title = attachment.name;
+
+    const name = document.createElement("span");
+    name.className = "chip-name";
+    name.textContent = attachment.name;
+
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "chip-remove";
+    removeBtn.textContent = "✕";
+    removeBtn.title = "Remover anexo";
+    removeBtn.dataset.index = String(index);
+
+    chip.appendChild(name);
+    chip.appendChild(removeBtn);
+    container.appendChild(chip);
+  });
 }

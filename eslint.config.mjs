@@ -13,6 +13,7 @@ export default [
       globals: {
         ...globals.browser,
         Excel: "readonly",
+        Word: "readonly",
         Office: "readonly",
       },
     },

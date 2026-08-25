@@ -5,16 +5,16 @@ async function executeTool(toolName, args) {
     let result;
     switch (toolName) {
       case "read_cells":
-        result = await readCells(args.range);
+        result = await readCells(args.range, args.sheet);
         break;
       case "write_cells":
-        result = await writeCells(args.range, args.values);
+        result = await writeCells(args.range, args.values, args.sheet);
         break;
       case "format_cells":
-        result = await formatCells(args.range, args);
+        result = await formatCells(args.range, args, args.sheet);
         break;
       case "clear_cells":
-        result = await clearCells(args.range);
+        result = await clearCells(args.range, args.sheet);
         break;
       case "get_sheet_info":
         result = await getSheetInfo();
@@ -31,11 +31,21 @@ async function executeTool(toolName, args) {
   }
 }
 
-function readCells(range) {
+function resolveSheet(context, sheetName) {
+  if (sheetName) {
+    return context.workbook.worksheets.getItem(sheetName);
+  }
+  return context.workbook.worksheets.getActiveWorksheet();
+}
+
+function rangeLabel(sheetName, range) {
+  return (sheetName ? sheetName + "!" : "") + range;
+}
+
+function readCells(range, sheetName) {
   return new Promise((resolve, reject) => {
     Excel.run(async (context) => {
-      const sheet = context.workbook.worksheets.getActiveWorksheet();
-      const rangeObj = sheet.getRange(range);
+      const rangeObj = resolveSheet(context, sheetName).getRange(range);
       rangeObj.load("values");
       await context.sync();
       resolve(rangeObj.values);
@@ -43,23 +53,21 @@ function readCells(range) {
   });
 }
 
-function writeCells(range, values) {
+function writeCells(range, values, sheetName) {
   return new Promise((resolve, reject) => {
     Excel.run(async (context) => {
-      const sheet = context.workbook.worksheets.getActiveWorksheet();
-      const rangeObj = sheet.getRange(range);
+      const rangeObj = resolveSheet(context, sheetName).getRange(range);
       rangeObj.values = values;
       await context.sync();
-      resolve("Valores escritos com sucesso em " + range);
+      resolve("Valores escritos com sucesso em " + rangeLabel(sheetName, range));
     }).catch(reject);
   });
 }
 
-function formatCells(range, format) {
+function formatCells(range, format, sheetName) {
   return new Promise((resolve, reject) => {
     Excel.run(async (context) => {
-      const sheet = context.workbook.worksheets.getActiveWorksheet();
-      const rangeObj = sheet.getRange(range);
+      const rangeObj = resolveSheet(context, sheetName).getRange(range);
 
       if (format.bold !== undefined) rangeObj.format.font.bold = format.bold;
       if (format.italic !== undefined) rangeObj.format.font.italic = format.italic;
@@ -68,19 +76,18 @@ function formatCells(range, format) {
       if (format.numberFormat) rangeObj.numberFormat = format.numberFormat;
 
       await context.sync();
-      resolve("Formatação aplicada em " + range);
+      resolve("Formatação aplicada em " + rangeLabel(sheetName, range));
     }).catch(reject);
   });
 }
 
-function clearCells(range) {
+function clearCells(range, sheetName) {
   return new Promise((resolve, reject) => {
     Excel.run(async (context) => {
-      const sheet = context.workbook.worksheets.getActiveWorksheet();
-      const rangeObj = sheet.getRange(range);
+      const rangeObj = resolveSheet(context, sheetName).getRange(range);
       rangeObj.clear("Contents");
       await context.sync();
-      resolve("Células limpas: " + range);
+      resolve("Células limpas: " + rangeLabel(sheetName, range));
     }).catch(reject);
   });
 }
@@ -88,15 +95,23 @@ function clearCells(range) {
 function getSheetInfo() {
   return new Promise((resolve, reject) => {
     Excel.run(async (context) => {
-      const sheet = context.workbook.worksheets.getActiveWorksheet();
-      sheet.load("name");
-      const usedRange = sheet.getUsedRange();
-      usedRange.load("address");
+      const worksheets = context.workbook.worksheets;
+      worksheets.load("items/name");
+      const active = worksheets.getActiveWorksheet();
+      active.load("name");
       await context.sync();
-      resolve({
-        sheetName: sheet.name,
-        usedRange: usedRange.address,
-      });
+
+      const usedRanges = worksheets.items.map((sheet) => sheet.getUsedRangeOrNullObject(true));
+      usedRanges.forEach((usedRange) => usedRange.load("address"));
+      await context.sync();
+
+      const sheets = worksheets.items.map((sheet, index) => ({
+        name: sheet.name,
+        active: sheet.name === active.name,
+        usedRange: usedRanges[index].isNullObject ? null : usedRanges[index].address,
+      }));
+
+      resolve({ activeSheet: active.name, sheets: sheets });
     }).catch(reject);
   });
 }

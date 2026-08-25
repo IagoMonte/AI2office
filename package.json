@@ -28,8 +28,11 @@
   "dependencies": {
     "core-js": "^3.36.0",
     "dompurify": "^3.4.14",
+    "mammoth": "^1.12.1",
     "marked": "^18.0.11",
-    "regenerator-runtime": "^0.14.1"
+    "pdfjs-dist": "^6.2.108",
+    "regenerator-runtime": "^0.14.1",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@babel/core": "^8.0.1",

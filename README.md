@@ -16,7 +16,7 @@ O AI2office adiciona um painel de chat (task pane) aos aplicativos do Microsoft 
 | Aplicativo | Status | Ferramentas |
 |---|---|---|
 | Excel | ✅ Implementado | Leitura, escrita, formatação, limpeza, info da planilha, seleção atual |
-| Word | 🔜 Planejado | — |
+| Word | ✅ Implementado | Leitura, inserção, substituição de seleção, formatação, buscar/substituir, limpar documento, estatísticas, seleção atual |
 | PowerPoint | 🔜 Planejado | — |
 | Outlook | 🔜 Planejado | — |
 
@@ -24,9 +24,19 @@ O AI2office adiciona um painel de chat (task pane) aos aplicativos do Microsoft 
 
 - Chat com histórico de conversa mantido durante a sessão
 - Loop de *tool calling* com múltiplas chamadas por turno
+- **Visão de todas as abas**: `get_sheet_info` lista todas as worksheets do arquivo e as ferramentas de intervalo aceitam o parâmetro opcional `sheet` para operar em qualquer aba
 - **Consciência de seleção**: a seleção atual do usuário é capturada a cada envio e injetada no prompt do sistema — o assistente entende "isto", "aqui", "minha seleção" sem perguntas extras
 - Tool dedicada `get_selection` para buscar endereço, dimensões e valores da seleção (valores limitados a 200 células para proteger o contexto da API)
 - Painel de configurações (endpoint, chave, modelo) com validação e carregamento dinâmico de modelos
+- Uso de ferramentas visível em tempo real no chat: o grupo expande durante a execução e mostra qual ferramenta está rodando
+- **Anexos**: botão 📎 ou **arrastar e soltar** arquivos `.xlsx`, `.xls`, `.csv`, `.txt`, `.pdf` e `.docx` direto no painel; o conteúdo é extraído no próprio add-in e injetado na conversa (limite de 12.000 caracteres por arquivo e 40.000 no total) — permite consultar outros arquivos abertos ou locais sem sair do chat
+
+## Funcionalidades atuais (Word)
+
+- Mesmo loop agêntico do Excel: o host ativo (`Office.context.host`) define o prompt, as ferramentas e o módulo de execução usados no turno
+- Consciência de seleção textual: o trecho selecionado é injetado no contexto (limitado a 2.000 caracteres)
+- `read_document` retorna até 8.000 caracteres com flag de truncamento para proteger o contexto da API
+- Leitura posicional para documentos longos: `get_doc_info` traz um outline de títulos com índice de parágrafo, `read_paragraphs` lê janelas de parágrafos (estilo + truncamento de 500 caracteres cada) e `find_in_document` mapeia ocorrências com número do parágrafo e contexto
 
 ## Arquitetura
 
@@ -48,10 +58,12 @@ src/taskpane/
 ├── chatView.js        # renderização de mensagens e indicador de loading
 ├── settingsView.js    # formulário de configurações
 ├── modelSelect.js     # fetch/render do seletor de modelos
-├── agent.js           # sendMessage + loop de tool calling
+├── attachments.js     # anexos: extração de texto (xlsx/csv/pdf/docx) e fila pendente
+├── agent.js           # sendMessage + loop de tool calling + roteamento por host
 └── tools/
-    ├── schema.js      # SYSTEM_PROMPT + definição JSON das ferramentas
-    └── excel.js       # execução das ferramentas via Office.js
+    ├── schema.js      # SYSTEM_PROMPT + definição JSON das ferramentas por aplicativo
+    ├── excel.js       # execução das ferramentas do Excel via Office.js
+    └── word.js        # execução das ferramentas do Word via Office.js
 ```
 
 A camada `tools/` foi projetada para crescer por aplicativo: cada novo app do Office receberá seu próprio módulo de execução (ex.: `tools/word.js`, `tools/outlook.js`) e entradas correspondentes em `schema.js`, reaproveitando o mesmo loop do `agent.js`.
@@ -60,12 +72,29 @@ A camada `tools/` foi projetada para crescer por aplicativo: cada novo app do Of
 
 | Ferramenta | Descrição |
 |---|---|
-| `read_cells` | Lê valores de um intervalo (ex.: `"B2:D10"`) |
-| `write_cells` | Escreve valores em células a partir de um range inicial |
-| `format_cells` | Aplica negrito, itálico, cor de fundo, cor da fonte, tamanho |
-| `clear_cells` | Limpa o conteúdo de um intervalo |
-| `get_sheet_info` | Retorna nome da aba ativa e intervalo usado |
+| `read_cells` | Lê valores de um intervalo (ex.: `"B2:D10"`); aceita aba específica via `sheet` |
+| `write_cells` | Escreve valores em células a partir de um range inicial; aceita aba específica |
+| `format_cells` | Aplica negrito, itálico, cor de fundo, cor da fonte, tamanho; aceita aba específica |
+| `clear_cells` | Limpa o conteúdo de um intervalo; aceita aba específica |
+| `get_sheet_info` | Lista todas as abas com seus intervalos usados e indica a aba ativa |
 | `get_selection` | Retorna endereço, dimensões e valores da seleção atual |
+
+## Ferramentas disponíveis (Word)
+
+| Ferramenta | Descrição |
+|---|---|
+| `read_document` | Lê o texto do corpo do documento (limitado a 8.000 caracteres) |
+| `read_paragraphs` | Lê uma janela de parágrafos por posição (`from` 1-based, `count`; até 50) com estilo e truncamento por parágrafo |
+| `find_in_document` | Localiza ocorrências de um texto e retorna o número do parágrafo e contexto de cada uma (até 10) |
+| `insert_text` | Insere texto no cursor, no início ou no final do documento |
+| `replace_selection` | Substitui o trecho selecionado pelo texto informado |
+| `format_selection` | Aplica negrito, itálico, sublinhado, tachado, cor e tamanho na seleção |
+| `find_replace` | Localiza e substitui todas as ocorrências de um texto |
+| `clear_content` | Limpa todo o conteúdo do documento |
+| `get_doc_info` | Retorna contagens (parágrafos, caracteres, palavras) e outline de títulos com índice de parágrafo |
+| `get_selection` | Retorna o texto selecionado (limitado a 2.000 caracteres) |
+
+Em documentos longos, o fluxo recomendado para a IA é: `get_doc_info` (mapa dos títulos) → `read_paragraphs` nas regiões relevantes → `find_in_document` para localizar termos; `read_document` fica para documentos curtos.
 
 ## Como executar
 
@@ -120,7 +149,8 @@ npm run validate    # valida o manifest.xml
 
 - [ ] Validação completa em runtime das ferramentas do Excel
 - [ ] Novas ferramentas do Excel (gráficos, ordenar/filtrar, tabelas)
+- [ ] Novas ferramentas do Word (títulos/estilos, listas, tabelas)
 - [ ] Streaming de respostas do modelo
-- [ ] Módulo de ferramentas para **Word**
+- [x] Módulo de ferramentas para **Word**
 - [ ] Módulo de ferramentas para **PowerPoint**
 - [ ] Módulo de ferramentas para **Outlook**

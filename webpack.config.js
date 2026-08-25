@@ -69,6 +69,10 @@ module.exports = async (env, options) => {
               }
             },
           },
+          {
+            from: "node_modules/pdfjs-dist/build/pdf.worker.min.mjs",
+            to: "pdf.worker.min.mjs",
+          },
         ],
       }),
       new HtmlWebpackPlugin({

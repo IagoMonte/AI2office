@@ -1,8 +1,16 @@
-import { SYSTEM_PROMPT, TOOLS } from "./tools/schema.js";
-import { executeTool, describeSelection } from "./tools/excel.js";
+import { getSchemaForHost } from "./tools/schema.js";
+import {
+  executeTool as executeExcelTool,
+  describeSelection as describeExcelSelection,
+} from "./tools/excel.js";
+import {
+  executeTool as executeWordTool,
+  describeSelection as describeWordSelection,
+} from "./tools/word.js";
 import { requestJson } from "./http.js";
 import { getHistory, pushHistory, isBusy, setLoading } from "./state.js";
 import { getEndpoint, getApiKey, setSavedModel } from "./config.js";
+import { formatPendingAttachments, clearPendingAttachments } from "./attachments.js";
 import {
   addMessage,
   addLoadingIndicator,
@@ -20,6 +28,26 @@ function getChatConfig() {
     apiKey: getApiKey(),
     model: document.getElementById("modelSelect").value,
   };
+}
+
+let activeHost = null;
+
+function getActiveHost() {
+  if (!activeHost) {
+    try {
+      activeHost = Office.context.host === Office.HostType.Word ? "word" : "excel";
+    } catch {
+      activeHost = "excel";
+    }
+  }
+  return activeHost;
+}
+
+function getToolModule() {
+  if (getActiveHost() === "word") {
+    return { executeTool: executeWordTool, describeSelection: describeWordSelection };
+  }
+  return { executeTool: executeExcelTool, describeSelection: describeExcelSelection };
 }
 
 export function sendMessage() {
@@ -45,7 +73,15 @@ export function sendMessage() {
   updateSendButton();
 
   addMessage("user", text);
-  pushHistory({ role: "user", content: text });
+
+  let content = text;
+  const attachmentsBlock = formatPendingAttachments();
+  if (attachmentsBlock) {
+    content += "\n\n" + attachmentsBlock;
+    clearPendingAttachments();
+  }
+
+  pushHistory({ role: "user", content: content });
 
   resetToolActivity();
   addLoadingIndicator();
@@ -55,14 +91,14 @@ export function sendMessage() {
 }
 
 async function startTurn(chatEndpoint, config) {
-  const selection = await describeSelection();
+  const selection = await getToolModule().describeSelection();
   callApiWithTools(chatEndpoint, config, selection);
 }
 
 function buildMessages(selection) {
-  let systemContent = SYSTEM_PROMPT;
+  let systemContent = getSchemaForHost(getActiveHost()).SYSTEM_PROMPT;
   if (selection) {
-    systemContent += "\n\nSeleção atual do usuário na planilha: " + selection;
+    systemContent += "\n\nSeleção atual do usuário: " + selection;
   }
   return [{ role: "system", content: systemContent }].concat(getHistory());
 }
@@ -110,7 +146,7 @@ async function handleResponse(chatEndpoint, config, selection, xhr) {
         }
 
         const activity = beginToolActivity(fnName, fnArgs);
-        const result = await executeTool(fnName, fnArgs);
+        const result = await getToolModule().executeTool(fnName, fnArgs);
         completeToolActivity(activity, fnName, result);
 
         pushHistory({
@@ -140,7 +176,7 @@ function callApiWithTools(chatEndpoint, config, selection) {
     body: JSON.stringify({
       model: config.model,
       messages: buildMessages(selection),
-      tools: TOOLS,
+      tools: getSchemaForHost(getActiveHost()).TOOLS,
     }),
   }).then(
     (xhr) => handleResponse(chatEndpoint, config, selection, xhr),
