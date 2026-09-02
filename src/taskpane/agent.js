@@ -7,6 +7,10 @@ import {
   executeTool as executeWordTool,
   describeSelection as describeWordSelection,
 } from "./tools/word.js";
+import {
+  executeTool as executePowerPointTool,
+  describeSelection as describePowerPointSelection,
+} from "./tools/powerpoint.js";
 import { requestJson } from "./http.js";
 import { getHistory, pushHistory, isBusy, setLoading } from "./state.js";
 import { getEndpoint, getApiKey, setSavedModel } from "./config.js";
@@ -35,7 +39,13 @@ let activeHost = null;
 function getActiveHost() {
   if (!activeHost) {
     try {
-      activeHost = Office.context.host === Office.HostType.Word ? "word" : "excel";
+      if (Office.context.host === Office.HostType.Word) {
+        activeHost = "word";
+      } else if (Office.context.host === Office.HostType.PowerPoint) {
+        activeHost = "powerpoint";
+      } else {
+        activeHost = "excel";
+      }
     } catch {
       activeHost = "excel";
     }
@@ -46,6 +56,9 @@ function getActiveHost() {
 function getToolModule() {
   if (getActiveHost() === "word") {
     return { executeTool: executeWordTool, describeSelection: describeWordSelection };
+  }
+  if (getActiveHost() === "powerpoint") {
+    return { executeTool: executePowerPointTool, describeSelection: describePowerPointSelection };
   }
   return { executeTool: executeExcelTool, describeSelection: describeExcelSelection };
 }
@@ -177,6 +190,7 @@ function callApiWithTools(chatEndpoint, config, selection) {
       model: config.model,
       messages: buildMessages(selection),
       tools: getSchemaForHost(getActiveHost()).TOOLS,
+      stream: false,
     }),
   }).then(
     (xhr) => handleResponse(chatEndpoint, config, selection, xhr),
