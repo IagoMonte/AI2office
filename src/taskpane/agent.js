@@ -7,10 +7,6 @@ import {
   executeTool as executeWordTool,
   describeSelection as describeWordSelection,
 } from "./tools/word.js";
-import {
-  executeTool as executePowerPointTool,
-  describeSelection as describePowerPointSelection,
-} from "./tools/powerpoint.js";
 import { requestJson } from "./http.js";
 import { getHistory, pushHistory, isBusy, setLoading } from "./state.js";
 import { getEndpoint, getApiKey, setSavedModel } from "./config.js";
@@ -41,8 +37,6 @@ function getActiveHost() {
     try {
       if (Office.context.host === Office.HostType.Word) {
         activeHost = "word";
-      } else if (Office.context.host === Office.HostType.PowerPoint) {
-        activeHost = "powerpoint";
       } else {
         activeHost = "excel";
       }
@@ -56,9 +50,6 @@ function getActiveHost() {
 function getToolModule() {
   if (getActiveHost() === "word") {
     return { executeTool: executeWordTool, describeSelection: describeWordSelection };
-  }
-  if (getActiveHost() === "powerpoint") {
-    return { executeTool: executePowerPointTool, describeSelection: describePowerPointSelection };
   }
   return { executeTool: executeExcelTool, describeSelection: describeExcelSelection };
 }

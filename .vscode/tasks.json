@@ -63,24 +63,6 @@
       "problemMatcher": []
     },
     {
-      "label": "Debug: PowerPoint Desktop",
-      "type": "shell",
-      "command": "npm",
-      "args": [
-        "run",
-        "start",
-        "--",
-        "desktop",
-        "--app",
-        "powerpoint"
-      ],
-      "presentation": {
-        "clear": true,
-        "panel": "dedicated"
-      },
-      "problemMatcher": []
-    },
-    {
       "label": "Debug: Word Desktop",
       "type": "shell",
       "command": "npm",
