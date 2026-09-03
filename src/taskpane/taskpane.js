@@ -9,18 +9,6 @@ import {
 } from "./settingsView.js";
 import { fetchModels } from "./modelSelect.js";
 import { addAttachment, removeAttachment, onAttachmentsChanged } from "./attachments.js";
-import { initPptDebug } from "./pptDebug.js";
-
-function isPowerPointHost() {
-  try {
-    if (typeof Office !== "undefined" && Office.context && Office.context.host) {
-      return Office.context.host === Office.HostType.PowerPoint;
-    }
-  } catch {
-    return false;
-  }
-  return false;
-}
 
 async function handleFiles(files) {
   for (const file of files) {
@@ -38,41 +26,8 @@ function isFileDrag(event) {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  // PowerPoint: abre a tela provisória de debug (um bloco por módulo),
-  // não o chat — facilita depurar leitura/busca/escrita/polling.
-  // Estratégia: inicia o chat por padrão (Excel/Word/navegador) e,
-  // se o host for PowerPoint, troca para o debug (esconde o chat).
   initChat();
-
-  const forcePpt =
-    typeof window !== "undefined" && /[?&]host=ppt/i.test(window.location.search || "");
-  if (forcePpt) {
-    initPptDebug();
-    mostrarBotaoDebugNoChat();
-    return;
-  }
-
-  if (typeof Office !== "undefined" && typeof Office.onReady === "function") {
-    Office.onReady((info) => {
-      if (info && info.host === Office.HostType.PowerPoint) {
-        initPptDebug();
-        mostrarBotaoDebugNoChat();
-      } else if (isPowerPointHost()) {
-        initPptDebug();
-        mostrarBotaoDebugNoChat();
-      }
-    });
-  } else if (isPowerPointHost()) {
-    initPptDebug();
-    mostrarBotaoDebugNoChat();
-  }
 });
-
-// Exibe no chat o botão de volta ao debug (só faz sentido no host PowerPoint).
-function mostrarBotaoDebugNoChat() {
-  const btn = document.getElementById("btnChatGoPptDebug");
-  if (btn) btn.classList.remove("hidden");
-}
 
 function initChat() {
   if (initChat.done) return;
@@ -90,8 +45,6 @@ function initChat() {
   document.getElementById("settingsForm").addEventListener("submit", saveSettings);
   document.getElementById("toggleKeyBtn").addEventListener("click", toggleKeyVisibility);
   document.getElementById("refreshModelsBtn").addEventListener("click", fetchModels);
-  const btnVoltarDebug = document.getElementById("btnChatGoPptDebug");
-  if (btnVoltarDebug) btnVoltarDebug.addEventListener("click", initPptDebug);
 
   const fileInput = document.getElementById("fileInput");
   document.getElementById("attachBtn").addEventListener("click", () => fileInput.click());

@@ -1,6 +1,4 @@
-/* Fachada do PowerPoint: dispatcher de tools (uso futuro pelo agent.js)
- * + re-exports dos módulos para a tela provisória de debug.
- */
+/* Fachada do PowerPoint: dispatcher de tools usado pelo agent.js. */
 
 import { getCache, setCache, clearCache } from "./cache.js";
 import {
