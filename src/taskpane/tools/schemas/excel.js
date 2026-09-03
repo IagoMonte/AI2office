@@ -133,6 +133,41 @@ const EXCEL_TOOLS = [
   {
     type: "function",
     function: {
+      name: "resize_cells",
+      description:
+        "Redimensiona linhas/colunas de um intervalo (largura/altura explícitas ou ajuste automático ao conteúdo)",
+      parameters: {
+        type: "object",
+        properties: {
+          range: {
+            type: "string",
+            description: "Intervalo de células (ex: 'A1', 'A:C', '1:5')",
+          },
+          sheet: {
+            type: "string",
+            description: "Nome da aba (opcional; padrão: aba ativa)",
+          },
+          columnWidth: {
+            type: "number",
+            description: "Largura das colunas do intervalo (número > 0)",
+          },
+          rowHeight: {
+            type: "number",
+            description: "Altura das linhas do intervalo em pontos (número > 0)",
+          },
+          autofit: {
+            type: "string",
+            enum: ["columns", "rows", "both"],
+            description: "Ajuste automático ao conteúdo: colunas, linhas ou ambos",
+          },
+        },
+        required: ["range"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "get_sheet_info",
       description:
         "Lista todas as abas da pasta de trabalho com o intervalo usado de cada uma e indica a aba ativa",

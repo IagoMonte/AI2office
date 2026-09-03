@@ -16,6 +16,9 @@ async function executeTool(toolName, args) {
       case "clear_cells":
         result = await clearCells(args.range, args.sheet);
         break;
+      case "resize_cells":
+        result = await resizeCells(args.range, args.sheet, args);
+        break;
       case "get_sheet_info":
         result = await getSheetInfo();
         break;
@@ -88,6 +91,76 @@ function clearCells(range, sheetName) {
       rangeObj.clear("Contents");
       await context.sync();
       resolve("Células limpas: " + rangeLabel(sheetName, range));
+    }).catch(reject);
+  });
+}
+
+function resizeCells(range, sheetName, options) {
+  return new Promise((resolve, reject) => {
+    Excel.run(async (context) => {
+      const opts = options || {};
+      const hasWidth = opts.columnWidth !== undefined && opts.columnWidth !== null;
+      const hasHeight = opts.rowHeight !== undefined && opts.rowHeight !== null;
+      const autofit = opts.autofit;
+
+      if (!hasWidth && !hasHeight && !autofit) {
+        throw new Error(
+          'Nada para redimensionar: informe "columnWidth", "rowHeight" ou "autofit".'
+        );
+      }
+
+      let columnWidth;
+      if (hasWidth) {
+        columnWidth = Number(opts.columnWidth);
+        if (!Number.isFinite(columnWidth) || columnWidth <= 0) {
+          throw new Error('Parâmetro "columnWidth" inválido: informe número > 0.');
+        }
+      }
+
+      let rowHeight;
+      if (hasHeight) {
+        rowHeight = Number(opts.rowHeight);
+        if (!Number.isFinite(rowHeight) || rowHeight <= 0) {
+          throw new Error('Parâmetro "rowHeight" inválido: informe número > 0.');
+        }
+      }
+
+      if (
+        autofit !== undefined &&
+        autofit !== null &&
+        !["columns", "rows", "both"].includes(autofit)
+      ) {
+        throw new Error('Parâmetro "autofit" inválido: use "columns", "rows" ou "both".');
+      }
+
+      const rangeObj = resolveSheet(context, sheetName).getRange(range);
+      const applied = [];
+
+      if (hasWidth) {
+        rangeObj.format.columnWidth = columnWidth;
+        applied.push("largura=" + columnWidth);
+      }
+      if (hasHeight) {
+        rangeObj.format.rowHeight = rowHeight;
+        applied.push("altura=" + rowHeight);
+      }
+      if (autofit === "columns" || autofit === "both") {
+        rangeObj.format.autofitColumns();
+        applied.push("autofit-colunas");
+      }
+      if (autofit === "rows" || autofit === "both") {
+        rangeObj.format.autofitRows();
+        applied.push("autofit-linhas");
+      }
+
+      await context.sync();
+      resolve(
+        "Células redimensionadas em " +
+          rangeLabel(sheetName, range) +
+          ": " +
+          applied.join(", ") +
+          "."
+      );
     }).catch(reject);
   });
 }
