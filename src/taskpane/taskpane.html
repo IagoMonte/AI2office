@@ -70,6 +70,106 @@
             </div>
         </div>
 
+        <div id="pptDebugView" class="ppt-debug hidden">
+            <div class="ppt-debug-header">
+                <h2 class="ms-font-l">PowerPoint — Debug provisório</h2>
+                <p id="pptStatus" class="ms-font-s ppt-status">inicializando...</p>
+            </div>
+
+            <div class="ppt-card">
+                <h3 class="ms-font-m">Módulo 1 — Leitura (getAllContent)</h3>
+                <div class="ppt-row">
+                    <button id="btnPptRead" class="btn btn-primary">Ler tudo</button>
+                    <button id="btnPptApiCheck" class="btn btn-secondary">Verificar API 1.8</button>
+                    <button id="btnPptClearCache" class="btn btn-secondary">Limpar cache</button>
+                </div>
+                <pre id="pptReadOut" class="ppt-out">Nenhuma leitura ainda.</pre>
+            </div>
+
+            <div class="ppt-card">
+                <h3 class="ms-font-m">Módulo 2 — Busca (similaridade + localidade)</h3>
+                <div class="form-group">
+                    <label class="ms-font-s" for="pptSearchTerm">Termo</label>
+                    <input type="text" id="pptSearchTerm" class="form-input" placeholder="ex.: receita trimestral" />
+                </div>
+                <div class="ppt-row">
+                    <div class="form-group ppt-flex">
+                        <label class="ms-font-s" for="pptSearchTop">Top N</label>
+                        <input type="number" id="pptSearchTop" class="form-input" value="5" min="1" max="20" />
+                    </div>
+                    <div class="form-group ppt-flex2">
+                        <label class="ms-font-s" for="pptSearchRef">referenceId (opcional)</label>
+                        <input type="text" id="pptSearchRef" class="form-input" placeholder="id p/ priorizar proximidade" />
+                    </div>
+                </div>
+                <div class="ppt-row">
+                    <button id="btnPptSearch" class="btn btn-primary">Buscar no cache</button>
+                </div>
+                <div class="ppt-subblock">
+                    <h4 class="ms-font-s">Por tabela (searchTable)</h4>
+                    <div class="form-group">
+                        <label class="ms-font-s" for="pptTableId">Prefixo do id da tabela</label>
+                        <input type="text" id="pptTableId" class="form-input" placeholder="ex.: s0_85" />
+                    </div>
+                    <div class="ppt-row">
+                        <button id="btnPptSearchTable" class="btn btn-primary">Buscar tabela</button>
+                    </div>
+                </div>
+                <div class="ppt-subblock">
+                    <h4 class="ms-font-s">Por índice (searchIndex)</h4>
+                    <div class="ppt-row">
+                        <div class="form-group ppt-flex">
+                            <label class="ms-font-s" for="pptIndexNum">Índice</label>
+                            <input type="number" id="pptIndexNum" class="form-input" value="0" min="0" />
+                        </div>
+                        <div class="form-group ppt-flex">
+                            <label class="ms-font-s" for="pptIndexRadius">Raio</label>
+                            <input type="number" id="pptIndexRadius" class="form-input" value="3" min="0" max="20" />
+                        </div>
+                    </div>
+                    <div class="ppt-row">
+                        <button id="btnPptSearchIndex" class="btn btn-primary">Buscar vizinhança</button>
+                    </div>
+                </div>
+                <pre id="pptSearchOut" class="ppt-out">Nenhuma busca ainda.</pre>
+            </div>
+
+            <div class="ppt-card">
+                <h3 class="ms-font-m">Módulo 3 — Escrita (1 item por vez)</h3>
+                <div class="form-group">
+                    <label class="ms-font-s" for="pptReplaceId">Id do item (do M1/M2)</label>
+                    <input type="text" id="pptReplaceId" class="form-input" placeholder="ex.: s1_shape42 ou s1_shape42_r0c1" />
+                </div>
+                <div class="form-group">
+                    <label class="ms-font-s" for="pptReplaceText">Novo texto</label>
+                    <textarea id="pptReplaceText" class="form-input form-textarea" rows="2" placeholder="Texto substituto"></textarea>
+                </div>
+                <div class="ppt-row">
+                    <button id="btnPptReplace" class="btn btn-primary">Substituir item</button>
+                </div>
+                <pre id="pptReplaceOut" class="ppt-out">Nenhuma escrita ainda.</pre>
+            </div>
+
+            <div class="ppt-card">
+                <h3 class="ms-font-m">Módulo 4 — Atualização (polling)</h3>
+                <div class="ppt-row">
+                    <button id="btnPptMeasure" class="btn btn-primary">Medir leitura</button>
+                    <button id="btnPptPollStart" class="btn btn-secondary">Iniciar polling</button>
+                    <button id="btnPptPollStop" class="btn btn-secondary">Parar polling</button>
+                    <button id="btnPptRevalidate" class="btn btn-secondary">Revalidar agora</button>
+                </div>
+                <pre id="pptPollOut" class="ppt-out">Polling parado.</pre>
+            </div>
+
+            <div class="ppt-card">
+                <h3 class="ms-font-m">Log</h3>
+                <div class="ppt-row">
+                    <button id="btnPptClearLog" class="btn btn-secondary">Limpar log</button>
+                </div>
+                <pre id="pptLog" class="ppt-out ppt-log"></pre>
+            </div>
+        </div>
+
         <div id="settingsView" class="settings-view hidden">
             <div class="settings-content">
                 <div class="settings-header">

@@ -14,6 +14,7 @@ export default [
         ...globals.browser,
         Excel: "readonly",
         Word: "readonly",
+        PowerPoint: "readonly",
         Office: "readonly",
       },
     },

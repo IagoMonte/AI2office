@@ -9,6 +9,18 @@ import {
 } from "./settingsView.js";
 import { fetchModels } from "./modelSelect.js";
 import { addAttachment, removeAttachment, onAttachmentsChanged } from "./attachments.js";
+import { initPptDebug } from "./pptDebug.js";
+
+function isPowerPointHost() {
+  try {
+    if (typeof Office !== "undefined" && Office.context && Office.context.host) {
+      return Office.context.host === Office.HostType.PowerPoint;
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
 
 async function handleFiles(files) {
   for (const file of files) {
@@ -26,6 +38,35 @@ function isFileDrag(event) {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  // PowerPoint: abre a tela provisória de debug (um bloco por módulo),
+  // não o chat — facilita depurar leitura/busca/escrita/polling.
+  // Estratégia: inicia o chat por padrão (Excel/Word/navegador) e,
+  // se o host for PowerPoint, troca para o debug (esconde o chat).
+  initChat();
+
+  const forcePpt =
+    typeof window !== "undefined" && /[?&]host=ppt/i.test(window.location.search || "");
+  if (forcePpt) {
+    initPptDebug();
+    return;
+  }
+
+  if (typeof Office !== "undefined" && typeof Office.onReady === "function") {
+    Office.onReady((info) => {
+      if (info && info.host === Office.HostType.PowerPoint) {
+        initPptDebug();
+      } else if (isPowerPointHost()) {
+        initPptDebug();
+      }
+    });
+  } else if (isPowerPointHost()) {
+    initPptDebug();
+  }
+});
+
+function initChat() {
+  if (initChat.done) return;
+  initChat.done = true;
   document.getElementById("sendBtn").addEventListener("click", sendMessage);
   document.getElementById("chatInput").addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -96,4 +137,4 @@ document.addEventListener("DOMContentLoaded", () => {
 
   loadSettingsForm();
   fetchModels();
-});
+}
