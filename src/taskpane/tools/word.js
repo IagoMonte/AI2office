@@ -54,6 +54,18 @@ async function executeTool(toolName, args) {
       case "delete_table":
         result = await deleteTable(args.table);
         break;
+      case "read_header":
+        result = await readHeaderFooter("header");
+        break;
+      case "write_header":
+        result = await writeHeaderFooter("header", args.text);
+        break;
+      case "read_footer":
+        result = await readHeaderFooter("footer");
+        break;
+      case "write_footer":
+        result = await writeHeaderFooter("footer", args.text);
+        break;
       case "clear_content":
         result = await clearContent();
         break;
@@ -189,6 +201,74 @@ function findInDocument(query, matchCase) {
           position = haystack.indexOf(needle, position + needle.length);
         }
       });
+
+      function snippetAround(rawText, position, length) {
+        const contextStart = Math.max(0, position - MATCH_CONTEXT_CHARS);
+        const contextEnd = Math.min(rawText.length, position + length + MATCH_CONTEXT_CHARS);
+        return (
+          (contextStart > 0 ? "..." : "") +
+          rawText.substring(contextStart, contextEnd).trim() +
+          (contextEnd < rawText.length ? "..." : "")
+        );
+      }
+
+      function scanText(rawText, onHit) {
+        const haystack = String(matchCase ? rawText : rawText.toLowerCase());
+        let position = haystack.indexOf(needle);
+        while (position !== -1) {
+          totalMatches++;
+          if (matches.length < MAX_MATCHES) {
+            onHit(position);
+          }
+          position = haystack.indexOf(needle, position + needle.length);
+        }
+      }
+
+      if (isWordApi13Supported()) {
+        const tables = context.document.body.tables;
+        tables.load("items");
+        await context.sync();
+
+        const tableItems = tables.items;
+        tableItems.forEach((table) => table.load("values"));
+        await context.sync();
+
+        tableItems.forEach((table, tableIndex) => {
+          const values = table.values || [];
+          values.forEach((line, rowIndex) => {
+            (line || []).forEach((cell, columnIndex) => {
+              scanText(String(cell || ""), (position) => {
+                matches.push({
+                  table: tableIndex + 1,
+                  row: rowIndex + 1,
+                  column: columnIndex + 1,
+                  snippet: snippetAround(String(cell || ""), position, needle.length),
+                });
+              });
+            });
+          });
+        });
+
+        const section = context.document.sections.getFirst();
+        const header = section.getHeader("Primary");
+        const footer = section.getFooter("Primary");
+        header.load("text");
+        footer.load("text");
+        await context.sync();
+
+        scanText(header.text || "", (position) => {
+          matches.push({
+            location: "header",
+            snippet: snippetAround(header.text || "", position, needle.length),
+          });
+        });
+        scanText(footer.text || "", (position) => {
+          matches.push({
+            location: "footer",
+            snippet: snippetAround(footer.text || "", position, needle.length),
+          });
+        });
+      }
 
       resolve({
         query: query,
@@ -455,20 +535,83 @@ function deleteTable(table) {
   });
 }
 
-function findReplace(findText, replaceText, matchCase) {
+function readHeaderFooter(kind) {
   return new Promise((resolve, reject) => {
     Word.run(async (context) => {
+      requireTablesApi();
+      const section = context.document.sections.getFirst();
+      const body = kind === "header" ? section.getHeader("Primary") : section.getFooter("Primary");
+      body.load("text");
+      await context.sync();
+
+      const text = body.text || "";
+      resolve({ location: kind, charCount: text.length, text: text });
+    }).catch(reject);
+  });
+}
+
+function writeHeaderFooter(kind, text) {
+  return new Promise((resolve, reject) => {
+    Word.run(async (context) => {
+      requireTablesApi();
+      const section = context.document.sections.getFirst();
+      const body = kind === "header" ? section.getHeader("Primary") : section.getFooter("Primary");
+      body.clear();
+      body.insertText(
+        normalizeLineBreaks(text === undefined || text === null ? "" : String(text)),
+        "End"
+      );
+      await context.sync();
+
+      resolve((kind === "header" ? "Cabeçalho" : "Rodapé") + " atualizado com sucesso.");
+    }).catch(reject);
+  });
+}
+
+function findReplace(findText, replaceText, matchCase, occurrence) {
+  return new Promise((resolve, reject) => {
+    Word.run(async (context) => {
+      if (!findText || !String(findText).trim()) {
+        throw new Error("Texto de busca vazio.");
+      }
+
       const results = context.document.body.search(findText, { matchCase: !!matchCase });
       context.load(results, "items");
       await context.sync();
 
-      const count = results.items.length;
-      for (let i = 0; i < count; i++) {
-        results.items[i].insertText(replaceText, "Replace");
+      const total = results.items.length;
+      let targets = results.items;
+      let occurrenceLabel = "all";
+
+      if (
+        occurrence !== undefined &&
+        occurrence !== null &&
+        String(occurrence).toLowerCase() !== "all"
+      ) {
+        const n = Math.floor(Number(occurrence));
+        if (!Number.isFinite(n) || n < 1) {
+          throw new Error(
+            'Parâmetro "occurrence" inválido: use "all" ou o número da ocorrência (1-based).'
+          );
+        }
+        if (n > total) {
+          throw new Error(`Ocorrência ${n} não existe: "${findText}" tem ${total} ocorrência(s).`);
+        }
+        targets = [results.items[n - 1]];
+        occurrenceLabel = n;
+      }
+
+      for (let i = 0; i < targets.length; i++) {
+        targets[i].insertText(replaceText, "Replace");
       }
       await context.sync();
 
-      resolve(count + ' ocorrência(s) de "' + findText + '" substituída(s).');
+      resolve({
+        find: findText,
+        occurrence: occurrenceLabel,
+        totalFound: total,
+        replaced: targets.length,
+      });
     }).catch(reject);
   });
 }

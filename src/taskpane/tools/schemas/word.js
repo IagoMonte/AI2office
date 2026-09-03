@@ -174,7 +174,8 @@ const WORD_TOOLS = [
     type: "function",
     function: {
       name: "find_replace",
-      description: "Substitui todas as ocorrências de um texto no documento por outro texto",
+      description:
+        "Substitui ocorrências de um texto no documento por outro texto (todas por padrão, ou uma específica via 'occurrence')",
       parameters: {
         type: "object",
         properties: {
@@ -189,6 +190,11 @@ const WORD_TOOLS = [
           matchCase: {
             type: "boolean",
             description: "Diferenciar maiúsculas de minúsculas (padrão: false)",
+          },
+          occurrence: {
+            type: "string",
+            description:
+              'Qual ocorrência substituir: "all" (padrão) ou o número da ocorrência (1-based, ex: "2")',
           },
         },
         required: ["find", "replaceWith"],
@@ -344,6 +350,64 @@ const WORD_TOOLS = [
           },
         },
         required: ["table"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "read_header",
+      description: "Lê o texto do cabeçalho primário da primeira seção do documento",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "write_header",
+      description: "Substitui o texto do cabeçalho primário da primeira seção do documento",
+      parameters: {
+        type: "object",
+        properties: {
+          text: {
+            type: "string",
+            description: "Novo texto do cabeçalho (vazio limpa)",
+          },
+        },
+        required: ["text"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "read_footer",
+      description: "Lê o texto do rodapé primário da primeira seção do documento",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "write_footer",
+      description: "Substitui o texto do rodapé primário da primeira seção do documento",
+      parameters: {
+        type: "object",
+        properties: {
+          text: {
+            type: "string",
+            description: "Novo texto do rodapé (vazio limpa)",
+          },
+        },
+        required: ["text"],
       },
     },
   },
