@@ -1,7 +1,7 @@
 /* Módulo 4 — Atualização via polling (adaptativo + incremental). */
 
 import { getCache, setCache } from "./cache.js";
-import { lerConteudoDeTabela, temTextoSuportado } from "./reader.js";
+import { lerConteudoDeTabela, lerGeometria, temTextoSuportado } from "./reader.js";
 
 let intervalId = null;
 let tempoUltimaLeituraMs = null;
@@ -70,6 +70,7 @@ async function revalidarCacheIncremental() {
           if (shapeNova.textFrame.hasText) {
             shapeNova.textFrame.textRange.load("text");
             await context.sync();
+            const geo = await lerGeometria(context, shapeNova);
             cacheConteudo.push({
               id: `s${i}_${shapeNova.id}`,
               slideIndex: i,
@@ -81,12 +82,14 @@ async function revalidarCacheIncremental() {
               column: null,
               parentGroupId: null,
               texto: shapeNova.textFrame.textRange.text || "",
+              ...geo,
             });
           }
         }
       }
 
-      // Shapes que continuam existindo: revalida só o texto.
+      // Shapes que continuam existindo: revalida texto e geometria
+      // (o usuário pode ter arrastado a shape no slide).
       for (const itemCacheado of itensCacheDoSlide) {
         if (
           idsAtuais.has(itemCacheado.shapeId) &&
@@ -99,10 +102,16 @@ async function revalidarCacheIncremental() {
             await context.sync();
             if (shape.textFrame.hasText) {
               shape.textFrame.textRange.load("text");
+              shape.load("left, top, width, height, rotation");
               await context.sync();
               const idxCache = cacheConteudo.findIndex((c) => c.id === itemCacheado.id);
               if (idxCache !== -1) {
                 cacheConteudo[idxCache].texto = shape.textFrame.textRange.text || "";
+                cacheConteudo[idxCache].left = shape.left ?? null;
+                cacheConteudo[idxCache].top = shape.top ?? null;
+                cacheConteudo[idxCache].width = shape.width ?? null;
+                cacheConteudo[idxCache].height = shape.height ?? null;
+                cacheConteudo[idxCache].rotation = shape.rotation ?? null;
               }
             }
           }

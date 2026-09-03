@@ -1,28 +1,7 @@
 /* Módulo 3 — Escrita (substituição de valor selecionado, 1 item por vez). */
 
-import { getCache, updateCacheItem } from "./cache.js";
+import { updateCacheItem, findCacheItem } from "./cache.js";
 import { lerConteudoDeTabela } from "./reader.js";
-
-function findCacheItem(ref) {
-  const cache = getCache();
-  if (!ref) return null;
-  if (ref.id) {
-    const porId = cache.find((c) => c.id === ref.id);
-    if (porId) return porId;
-  }
-  if (ref.slideIndex !== undefined && ref.shapeId !== undefined) {
-    return (
-      cache.find(
-        (c) =>
-          c.slideIndex === Number(ref.slideIndex) &&
-          String(c.shapeId) === String(ref.shapeId) &&
-          (ref.row === undefined || c.row === Number(ref.row)) &&
-          (ref.column === undefined || c.column === Number(ref.column))
-      ) || null
-    );
-  }
-  return null;
-}
 
 async function substituirValor(itemCache, novoTexto) {
   if (!itemCache || !itemCache.id) {

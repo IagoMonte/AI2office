@@ -4,7 +4,7 @@
  * relê só aquela tabela para manter o cache consistente.
  */
 
-import { getCache, setCache } from "./cache.js";
+import { getCache, setCache, resolverRefShape } from "./cache.js";
 import { lerConteudoDeTabela, isPowerPointApi18Supported } from "./reader.js";
 
 function isPowerPointApi19Supported() {
@@ -51,8 +51,9 @@ async function resolverTabela(context, slideIndex, shapeId) {
 }
 
 async function relerTabelaEAtualizaCache(shapeId, slideIndex) {
-  const idx = validarSlideIndex(slideIndex);
-  const sid = String(shapeId);
+  const alvo = resolverRefShape(shapeId, slideIndex);
+  const idx = alvo.slideIndex;
+  const sid = alvo.shapeId;
   setCache(getCache().filter((c) => !(c.slideIndex === idx && String(c.shapeId) === sid)));
 
   let novosItens = [];
@@ -130,11 +131,13 @@ async function adicionarLinhas(shapeId, slideIndex, quantidade = 1, indice = nul
   if (!isPowerPointApi19Supported()) {
     throw new Error("Adicionar linhas exige PowerPoint API 1.9+.");
   }
-  const idx = validarSlideIndex(slideIndex);
+  const alvo = resolverRefShape(shapeId, slideIndex);
+  const idx = alvo.slideIndex;
+  const sid = alvo.shapeId;
   const qtd = validarInteiroPositivo(quantidade, "Quantidade");
 
   await PowerPoint.run(async (context) => {
-    const { shape } = await resolverTabela(context, idx, shapeId);
+    const { shape } = await resolverTabela(context, idx, sid);
     const table = shape.getTable();
     table.rows.load("count");
     await context.sync();
@@ -145,9 +148,9 @@ async function adicionarLinhas(shapeId, slideIndex, quantidade = 1, indice = nul
     await context.sync();
   });
 
-  const novosItens = await relerTabelaEAtualizaCache(shapeId, idx);
+  const novosItens = await relerTabelaEAtualizaCache(sid, idx);
   return {
-    shapeId: String(shapeId),
+    shapeId: sid,
     slideIndex: idx,
     adicionadas: qtd,
     celulas: novosItens.length,
@@ -158,11 +161,13 @@ async function adicionarColunas(shapeId, slideIndex, quantidade = 1, indice = nu
   if (!isPowerPointApi19Supported()) {
     throw new Error("Adicionar colunas exige PowerPoint API 1.9+.");
   }
-  const idx = validarSlideIndex(slideIndex);
+  const alvo = resolverRefShape(shapeId, slideIndex);
+  const idx = alvo.slideIndex;
+  const sid = alvo.shapeId;
   const qtd = validarInteiroPositivo(quantidade, "Quantidade");
 
   await PowerPoint.run(async (context) => {
-    const { shape } = await resolverTabela(context, idx, shapeId);
+    const { shape } = await resolverTabela(context, idx, sid);
     const table = shape.getTable();
     table.columns.load("count");
     await context.sync();
@@ -172,9 +177,9 @@ async function adicionarColunas(shapeId, slideIndex, quantidade = 1, indice = nu
     await context.sync();
   });
 
-  const novosItens = await relerTabelaEAtualizaCache(shapeId, idx);
+  const novosItens = await relerTabelaEAtualizaCache(sid, idx);
   return {
-    shapeId: String(shapeId),
+    shapeId: sid,
     slideIndex: idx,
     adicionadas: qtd,
     celulas: novosItens.length,
@@ -187,39 +192,43 @@ async function removerLinha(shapeId, slideIndex, indiceLinha) {
   if (!isPowerPointApi19Supported()) {
     throw new Error("Remover linha exige PowerPoint API 1.9+.");
   }
-  const idx = validarSlideIndex(slideIndex);
+  const alvo = resolverRefShape(shapeId, slideIndex);
+  const idx = alvo.slideIndex;
+  const sid = alvo.shapeId;
   const linha = Math.floor(Number(indiceLinha));
   if (!Number.isFinite(linha) || linha < 0) throw new Error(`Linha inválida: ${indiceLinha}.`);
 
   await PowerPoint.run(async (context) => {
-    const { shape } = await resolverTabela(context, idx, shapeId);
+    const { shape } = await resolverTabela(context, idx, sid);
     const table = shape.getTable();
     table.rows.getItemAt(linha).delete();
     await context.sync();
   });
 
-  const novosItens = await relerTabelaEAtualizaCache(shapeId, idx);
-  return { shapeId: String(shapeId), slideIndex: idx, removida: linha, celulas: novosItens.length };
+  const novosItens = await relerTabelaEAtualizaCache(sid, idx);
+  return { shapeId: sid, slideIndex: idx, removida: linha, celulas: novosItens.length };
 }
 
 async function removerColuna(shapeId, slideIndex, indiceColuna) {
   if (!isPowerPointApi19Supported()) {
     throw new Error("Remover coluna exige PowerPoint API 1.9+.");
   }
-  const idx = validarSlideIndex(slideIndex);
+  const alvo = resolverRefShape(shapeId, slideIndex);
+  const idx = alvo.slideIndex;
+  const sid = alvo.shapeId;
   const coluna = Math.floor(Number(indiceColuna));
   if (!Number.isFinite(coluna) || coluna < 0) throw new Error(`Coluna inválida: ${indiceColuna}.`);
 
   await PowerPoint.run(async (context) => {
-    const { shape } = await resolverTabela(context, idx, shapeId);
+    const { shape } = await resolverTabela(context, idx, sid);
     const table = shape.getTable();
     table.columns.getItemAt(coluna).delete();
     await context.sync();
   });
 
-  const novosItens = await relerTabelaEAtualizaCache(shapeId, idx);
+  const novosItens = await relerTabelaEAtualizaCache(sid, idx);
   return {
-    shapeId: String(shapeId),
+    shapeId: sid,
     slideIndex: idx,
     removida: coluna,
     celulas: novosItens.length,
@@ -230,7 +239,9 @@ async function removerVariasLinhas(shapeId, slideIndex, indices) {
   if (!isPowerPointApi19Supported()) {
     throw new Error("Remover linhas em lote exige PowerPoint API 1.9+.");
   }
-  const idx = validarSlideIndex(slideIndex);
+  const alvo = resolverRefShape(shapeId, slideIndex);
+  const idx = alvo.slideIndex;
+  const sid = alvo.shapeId;
   const lista = Array.isArray(indices) ? indices.map((i) => Math.floor(Number(i))) : [];
   if (!lista.length) throw new Error("Lista de linhas vazia.");
   if (lista.some((i) => !Number.isFinite(i) || i < 0)) {
@@ -238,7 +249,7 @@ async function removerVariasLinhas(shapeId, slideIndex, indices) {
   }
 
   await PowerPoint.run(async (context) => {
-    const { shape } = await resolverTabela(context, idx, shapeId);
+    const { shape } = await resolverTabela(context, idx, sid);
     const table = shape.getTable();
     table.rows.load("items");
     await context.sync();
@@ -250,9 +261,9 @@ async function removerVariasLinhas(shapeId, slideIndex, indices) {
     await context.sync();
   });
 
-  const novosItens = await relerTabelaEAtualizaCache(shapeId, idx);
+  const novosItens = await relerTabelaEAtualizaCache(sid, idx);
   return {
-    shapeId: String(shapeId),
+    shapeId: sid,
     slideIndex: idx,
     removidas: lista,
     celulas: novosItens.length,
@@ -263,7 +274,9 @@ async function removerVariasColunas(shapeId, slideIndex, indices) {
   if (!isPowerPointApi19Supported()) {
     throw new Error("Remover colunas em lote exige PowerPoint API 1.9+.");
   }
-  const idx = validarSlideIndex(slideIndex);
+  const alvo = resolverRefShape(shapeId, slideIndex);
+  const idx = alvo.slideIndex;
+  const sid = alvo.shapeId;
   const lista = Array.isArray(indices) ? indices.map((i) => Math.floor(Number(i))) : [];
   if (!lista.length) throw new Error("Lista de colunas vazia.");
   if (lista.some((i) => !Number.isFinite(i) || i < 0)) {
@@ -271,7 +284,7 @@ async function removerVariasColunas(shapeId, slideIndex, indices) {
   }
 
   await PowerPoint.run(async (context) => {
-    const { shape } = await resolverTabela(context, idx, shapeId);
+    const { shape } = await resolverTabela(context, idx, sid);
     const table = shape.getTable();
     table.columns.load("items");
     await context.sync();
@@ -281,9 +294,9 @@ async function removerVariasColunas(shapeId, slideIndex, indices) {
     await context.sync();
   });
 
-  const novosItens = await relerTabelaEAtualizaCache(shapeId, idx);
+  const novosItens = await relerTabelaEAtualizaCache(sid, idx);
   return {
-    shapeId: String(shapeId),
+    shapeId: sid,
     slideIndex: idx,
     removidas: lista,
     celulas: novosItens.length,

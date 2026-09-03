@@ -6,7 +6,7 @@
  * sem depender do polling do Módulo 4.
  */
 
-import { getCache, setCache } from "./cache.js";
+import { getCache, setCache, resolverRefShape } from "./cache.js";
 import { isPowerPointApi18Supported, temTextoSuportado } from "./reader.js";
 
 function numOu(valor, padrao) {
@@ -101,6 +101,11 @@ async function inserirTextBox(slideIndex, texto, posicao = {}) {
     column: null,
     parentGroupId: null,
     texto: textoFinal,
+    left,
+    top,
+    width,
+    height,
+    rotation: 0,
   });
   return { shapeId, shapeName, slideIndex: idx, id: `s${idx}_${shapeId}` };
 }
@@ -119,6 +124,10 @@ async function inserirForma(slideIndex, tipoForma, posicao = {}, texto = "") {
   let shapeId = null;
   let shapeName = null;
   let slideId = null;
+  const left = numOu(posicao.left, 50);
+  const top = numOu(posicao.top, 50);
+  const width = numOu(posicao.width, 150);
+  const height = numOu(posicao.height, 100);
   await PowerPoint.run(async (context) => {
     const slides = getSlidePorIndice(context);
     await context.sync();
@@ -126,12 +135,7 @@ async function inserirForma(slideIndex, tipoForma, posicao = {}, texto = "") {
     if (!slide) throw new Error(`Slide ${idx} não existe.`);
     slideId = slide.id;
 
-    const shape = slide.shapes.addGeometricShape(enumForma, {
-      left: numOu(posicao.left, 50),
-      top: numOu(posicao.top, 50),
-      width: numOu(posicao.width, 150),
-      height: numOu(posicao.height, 100),
-    });
+    const shape = slide.shapes.addGeometricShape(enumForma, { left, top, width, height });
     const textoFinal = String(texto || "");
     if (textoFinal) shape.textFrame.textRange.text = textoFinal;
     shape.load("id, name");
@@ -151,6 +155,11 @@ async function inserirForma(slideIndex, tipoForma, posicao = {}, texto = "") {
     column: null,
     parentGroupId: null,
     texto: String(texto || ""),
+    left,
+    top,
+    width,
+    height,
+    rotation: 0,
   });
   return { shapeId, shapeName, slideIndex: idx, id: `s${idx}_${shapeId}` };
 }
@@ -193,7 +202,9 @@ async function inserirLinha(slideIndex, tipoConector = "Straight", posicao = {})
 // --- 5.2 Manipulação ---
 
 async function moverRedimensionar(shapeId, slideIndex, novaPosicao = {}) {
-  const idx = validarSlideIndex(slideIndex);
+  const alvo = resolverRefShape(shapeId, slideIndex);
+  const idx = alvo.slideIndex;
+  const sid = alvo.shapeId;
   const { left, top, width, height } = novaPosicao || {};
   if (left === undefined && top === undefined && width === undefined && height === undefined) {
     throw new Error("Nada para alterar: informe ao menos left, top, width ou height.");
@@ -201,7 +212,7 @@ async function moverRedimensionar(shapeId, slideIndex, novaPosicao = {}) {
 
   let final = null;
   await PowerPoint.run(async (context) => {
-    const { shape } = await resolverShape(context, idx, shapeId);
+    const { shape } = await resolverShape(context, idx, sid);
     if (left !== undefined) shape.left = Number(left);
     if (top !== undefined) shape.top = Number(top);
     if (width !== undefined) shape.width = Number(width);
@@ -210,27 +221,40 @@ async function moverRedimensionar(shapeId, slideIndex, novaPosicao = {}) {
     await context.sync();
     final = { left: shape.left, top: shape.top, width: shape.width, height: shape.height };
   });
-  return { shapeId, slideIndex: idx, ...final };
+  // Cache acompanha a nova posição imediatamente.
+  const itemMovido = getCache().find(
+    (c) => c.slideIndex === idx && String(c.shapeId) === String(sid)
+  );
+  if (itemMovido) Object.assign(itemMovido, final);
+  return { shapeId: sid, slideIndex: idx, ...final };
 }
 
 async function rotacionar(shapeId, slideIndex, graus) {
-  const idx = validarSlideIndex(slideIndex);
+  const alvo = resolverRefShape(shapeId, slideIndex);
+  const idx = alvo.slideIndex;
+  const sid = alvo.shapeId;
   const g = Number(graus);
   if (!Number.isFinite(g))
     throw new Error(`Rotação inválida: ${graus}. Use graus (positivo = horário).`);
 
   await PowerPoint.run(async (context) => {
-    const { shape } = await resolverShape(context, idx, shapeId);
+    const { shape } = await resolverShape(context, idx, sid);
     shape.rotation = g;
     await context.sync();
   });
-  return { shapeId, slideIndex: idx, rotation: g };
+  const itemRotacionado = getCache().find(
+    (c) => c.slideIndex === idx && String(c.shapeId) === String(sid)
+  );
+  if (itemRotacionado) itemRotacionado.rotation = g;
+  return { shapeId: sid, slideIndex: idx, rotation: g };
 }
 
 const ORDENS_Z = ["bringToFront", "sendToBack", "bringForward", "sendBackward"];
 
 async function reordenar(shapeId, slideIndex, ordem) {
-  const idx = validarSlideIndex(slideIndex);
+  const alvo = resolverRefShape(shapeId, slideIndex);
+  const idx = alvo.slideIndex;
+  const sid = alvo.shapeId;
   const nomeOrdem = String(ordem || "bringToFront").trim() || "bringToFront";
   if (ORDENS_Z.indexOf(nomeOrdem) === -1) {
     throw new Error(`Ordem desconhecida: "${nomeOrdem}". Use: ${ORDENS_Z.join(", ")}.`);
@@ -240,21 +264,23 @@ async function reordenar(shapeId, slideIndex, ordem) {
   }
 
   await PowerPoint.run(async (context) => {
-    const { shape } = await resolverShape(context, idx, shapeId);
+    const { shape } = await resolverShape(context, idx, sid);
     shape.setZOrder(PowerPoint.ShapeZOrder[nomeOrdem]);
     await context.sync();
   });
-  return { shapeId, slideIndex: idx, ordem: nomeOrdem };
+  return { shapeId: sid, slideIndex: idx, ordem: nomeOrdem };
 }
 
 async function duplicarShape(shapeId, slideIndex, offset = {}) {
-  const idx = validarSlideIndex(slideIndex);
+  const alvo = resolverRefShape(shapeId, slideIndex);
+  const idx = alvo.slideIndex;
+  const sid = alvo.shapeId;
   const offLeft = numOu(offset.left, 20);
   const offTop = numOu(offset.top, 20);
 
   let nova = null;
   await PowerPoint.run(async (context) => {
-    const { slide, shape: original } = await resolverShape(context, idx, shapeId);
+    const { slide, shape: original } = await resolverShape(context, idx, sid);
     original.load("left, top, width, height, type, rotation");
     await context.sync();
 
@@ -289,7 +315,16 @@ async function duplicarShape(shapeId, slideIndex, offset = {}) {
     copia.rotation = original.rotation;
     copia.load("id, name");
     await context.sync();
-    nova = { shapeId: copia.id, shapeName: copia.name, texto: textoOriginal };
+    nova = {
+      shapeId: copia.id,
+      shapeName: copia.name,
+      texto: textoOriginal,
+      left: original.left + offLeft,
+      top: original.top + offTop,
+      width: original.width,
+      height: original.height,
+      rotation: original.rotation,
+    };
   });
 
   pushCacheItem({
@@ -303,19 +338,26 @@ async function duplicarShape(shapeId, slideIndex, offset = {}) {
     column: null,
     parentGroupId: null,
     texto: nova.texto,
+    left: nova.left,
+    top: nova.top,
+    width: nova.width,
+    height: nova.height,
+    rotation: nova.rotation,
   });
   return { ...nova, slideIndex: idx, id: `s${idx}_${nova.shapeId}` };
 }
 
 async function deletarShape(shapeId, slideIndex) {
-  const idx = validarSlideIndex(slideIndex);
+  const alvo = resolverRefShape(shapeId, slideIndex);
+  const idx = alvo.slideIndex;
+  const sid = alvo.shapeId;
   let removida = false;
   await PowerPoint.run(async (context) => {
     const slides = getSlidePorIndice(context);
     await context.sync();
     const slide = slides.items[idx];
     if (!slide) throw new Error(`Slide ${idx} não existe mais.`);
-    const shape = slide.shapes.getItemOrNullObject(shapeId);
+    const shape = slide.shapes.getItemOrNullObject(sid);
     await context.sync();
     if (shape.isNullObject) return; // idempotente: já foi deletada
     shape.delete();
@@ -323,44 +365,63 @@ async function deletarShape(shapeId, slideIndex) {
     removida = true;
   });
 
-  const removidosDoCache = removerDoCachePorShape(idx, shapeId);
-  return { shapeId, slideIndex: idx, removida, removidosDoCache };
+  const removidosDoCache = removerDoCachePorShape(idx, sid);
+  return { shapeId: sid, slideIndex: idx, removida, removidosDoCache };
 }
 
 async function deletarVarias(itens) {
   const lista = Array.isArray(itens) ? itens : [];
   if (!lista.length) throw new Error("Lista vazia: informe ao menos um {slideIndex, shapeId}.");
-  const normalizados = lista.map((i) => ({
-    slideIndex: validarSlideIndex(i.slideIndex),
-    shapeId: String(i.shapeId),
-  }));
+  // Aceita shapeId numérico ou id do cache em cada item.
+  const normalizados = lista.map((i) => {
+    const alvo = resolverRefShape(i.shapeId, i.slideIndex);
+    return { slideIndex: alvo.slideIndex, shapeId: alvo.shapeId };
+  });
 
+  const detalhes = [];
   await PowerPoint.run(async (context) => {
     const slides = context.presentation.slides;
     slides.load("items/id");
     await context.sync();
 
-    // Agrupa por slide; um único sync para todas as exclusões.
     const porSlide = {};
-    normalizados.forEach(({ slideIndex, shapeId }) => {
-      porSlide[slideIndex] = porSlide[slideIndex] || [];
-      porSlide[slideIndex].push(shapeId);
+    normalizados.forEach((n) => {
+      porSlide[n.slideIndex] = porSlide[n.slideIndex] || [];
+      porSlide[n.slideIndex].push(n.shapeId);
     });
     for (const key of Object.keys(porSlide)) {
       const slide = slides.items[Number(key)];
-      if (!slide) continue;
+      if (!slide) {
+        porSlide[key].forEach((shapeId) =>
+          detalhes.push({ slideIndex: Number(key), shapeId, removida: false })
+        );
+        continue;
+      }
+      slide.shapes.load("items/id");
+      await context.sync();
+      const idsAtuais = new Set(slide.shapes.items.map((s) => s.id));
       porSlide[key].forEach((shapeId) => {
-        slide.shapes.getItemOrNullObject(shapeId).delete();
+        if (idsAtuais.has(shapeId)) {
+          slide.shapes.getItemOrNullObject(shapeId).delete();
+          detalhes.push({ slideIndex: Number(key), shapeId, removida: true });
+        } else {
+          detalhes.push({ slideIndex: Number(key), shapeId, removida: false });
+        }
       });
     }
     await context.sync();
   });
 
   let removidosDoCache = 0;
-  normalizados.forEach(({ slideIndex, shapeId }) => {
-    removidosDoCache += removerDoCachePorShape(slideIndex, shapeId);
+  detalhes.forEach(({ slideIndex, shapeId, removida }) => {
+    if (removida) removidosDoCache += removerDoCachePorShape(slideIndex, shapeId);
   });
-  return { solicitadas: normalizados.length, removidosDoCache };
+  return {
+    solicitadas: normalizados.length,
+    removidas: detalhes.filter((d) => d.removida).length,
+    removidosDoCache,
+    detalhes,
+  };
 }
 
 export {

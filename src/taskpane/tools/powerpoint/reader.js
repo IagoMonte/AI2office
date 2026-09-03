@@ -1,5 +1,8 @@
 /* Módulo 1 — Leitura e disponibilização de conteúdo (PowerPoint).
  * Lê shapes normais, tabelas e shapes dentro de grupos.
+ * Segunda fase de carga: geometria (left, top, width, height, rotation)
+ * para noção de posicionamento — células de tabela carregam a
+ * bounding box da tabela + row/column.
  * Requer PowerPoint API 1.8+ para ungroup()/addGroup().
  */
 
@@ -30,6 +33,26 @@ function erroMsg(e) {
   return (e && e.message ? e.message : String(e)) + (e && e.code ? ` [${e.code}]` : "");
 }
 
+// Segunda fase de carga do Módulo 1: geometria da shape (pontos,
+// origem no canto superior esquerdo do slide). Nunca pode quebrar
+// a leitura do texto — em caso de falha retorna tudo null.
+async function lerGeometria(context, shape) {
+  const vazia = { left: null, top: null, width: null, height: null, rotation: null };
+  try {
+    shape.load("left, top, width, height, rotation");
+    await context.sync();
+    return {
+      left: shape.left ?? null,
+      top: shape.top ?? null,
+      width: shape.width ?? null,
+      height: shape.height ?? null,
+      rotation: shape.rotation ?? null,
+    };
+  } catch {
+    return vazia;
+  }
+}
+
 function isPowerPointApi18Supported() {
   try {
     // O nome correto do requirement set é "PowerPointApi" ("PowerPoint"
@@ -45,6 +68,10 @@ async function lerConteudoDeTabela(context, shape, base) {
   const table = shape.getTable();
   table.load("rowCount, columnCount");
   await context.sync();
+
+  // Geometria da tabela toda (cada célula carrega a bounding box da
+  // tabela + sua posição row/column — suficiente para posicionamento).
+  const geoTabela = await lerGeometria(context, shape);
 
   for (let r = 0; r < table.rowCount; r++) {
     for (let c = 0; c < table.columnCount; c++) {
@@ -63,6 +90,7 @@ async function lerConteudoDeTabela(context, shape, base) {
           column: c,
           parentGroupId: null,
           texto: cell.text || "",
+          ...geoTabela,
         });
       } catch (erroCell) {
         lastReadErrors.push({
@@ -128,6 +156,7 @@ async function lerConteudoDeGrupo(context, slide, grupoShape, slideIdx) {
         if (filha.textFrame.hasText) {
           filha.textFrame.textRange.load("text");
           await context.sync();
+          const geo = await lerGeometria(context, filha);
           itens.push({
             id: `s${slideIdx}_${filha.id}`,
             slideIndex: slideIdx,
@@ -139,6 +168,7 @@ async function lerConteudoDeGrupo(context, slide, grupoShape, slideIdx) {
             column: null,
             parentGroupId: idGrupoOriginal,
             texto: filha.textFrame.textRange.text || "",
+            ...geo,
           });
         }
       }
@@ -218,6 +248,7 @@ async function getAllContent(onProgress) {
           if (shape.type === "Group") {
             if (!isPowerPointApi18Supported()) {
               // Sem API 1.8 não há como ler dentro do grupo: registra placeholder para debug.
+              const geoGrupo = await lerGeometria(context, shape);
               resultado.push({
                 id: `s${slideIdx}_${shape.id}_grupo-nao-suportado`,
                 ...base,
@@ -225,6 +256,7 @@ async function getAllContent(onProgress) {
                 column: null,
                 parentGroupId: null,
                 texto: "[Grupo: leitura exige PowerPoint API 1.8+]",
+                ...geoGrupo,
               });
               continue;
             }
@@ -239,6 +271,8 @@ async function getAllContent(onProgress) {
             if (shape.textFrame.hasText) {
               shape.textFrame.textRange.load("text");
               await context.sync();
+              // Segunda fase de carga: geometria para noção de posicionamento.
+              const geo = await lerGeometria(context, shape);
               resultado.push({
                 id: `s${slideIdx}_${shape.id}`,
                 ...base,
@@ -246,6 +280,7 @@ async function getAllContent(onProgress) {
                 column: null,
                 parentGroupId: null,
                 texto: shape.textFrame.textRange.text || "",
+                ...geo,
               });
             }
           }
@@ -270,6 +305,7 @@ export {
   getAllContent,
   lerConteudoDeTabela,
   lerConteudoDeGrupo,
+  lerGeometria,
   isPowerPointApi18Supported,
   getLastReadErrors,
   getLastReadSkipped,

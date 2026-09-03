@@ -81,6 +81,7 @@ function previewItens(itens, limite) {
     tipo: c.tipo,
     shape: c.shapeName,
     texto: String(c.texto || "").substring(0, 120),
+    geo: [c.left ?? null, c.top ?? null, c.width ?? null, c.height ?? null],
   }));
 }
 
@@ -101,6 +102,11 @@ function listaCompleta(itens) {
     tipo: c.tipo,
     shape: c.shapeName,
     texto: c.texto || "",
+    left: c.left ?? null,
+    top: c.top ?? null,
+    width: c.width ?? null,
+    height: c.height ?? null,
+    rotation: c.rotation ?? null,
   }));
   if (itens.length > MAX_ITENS_NA_SAIDA) {
     lista.push({
@@ -197,6 +203,11 @@ async function onBuscar() {
         slideIndex: r.item.slideIndex,
         tipo: r.item.tipo,
         texto: String(r.item.texto || "").substring(0, 140),
+        left: r.item.left ?? null,
+        top: r.item.top ?? null,
+        width: r.item.width ?? null,
+        height: r.item.height ?? null,
+        rotation: r.item.rotation ?? null,
         scoreSimilaridade: Number(r.scoreSimilaridade.toFixed(3)),
         scoreLocalidade: Number(r.scoreLocalidade.toFixed(3)),
         scoreFinal: Number(r.scoreFinal.toFixed(3)),
@@ -232,6 +243,10 @@ function onBuscarTabela() {
         column: item.column,
         parentGroupId: item.parentGroupId,
         texto: item.texto || "",
+        left: item.left ?? null,
+        top: item.top ?? null,
+        width: item.width ?? null,
+        height: item.height ?? null,
       }))
     );
   } catch (e) {
@@ -258,6 +273,11 @@ function onBuscarIndice() {
         slideIndex: r.item.slideIndex,
         tipo: r.item.tipo,
         texto: r.item.texto || "",
+        left: r.item.left ?? null,
+        top: r.item.top ?? null,
+        width: r.item.width ?? null,
+        height: r.item.height ?? null,
+        rotation: r.item.rotation ?? null,
       }))
     );
   } catch (e) {

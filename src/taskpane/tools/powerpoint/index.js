@@ -8,6 +8,7 @@ import {
   isPowerPointApi18Supported,
   getLastReadErrors,
   getLastReadSkipped,
+  lerGeometria,
 } from "./reader.js";
 import {
   buscarCombinado,
@@ -67,6 +68,11 @@ async function executeTool(toolName, args) {
             shapeName: r.item.shapeName,
             tipo: r.item.tipo,
             texto: r.item.texto,
+            left: r.item.left ?? null,
+            top: r.item.top ?? null,
+            width: r.item.width ?? null,
+            height: r.item.height ?? null,
+            rotation: r.item.rotation ?? null,
             scoreSimilaridade: r.scoreSimilaridade,
             scoreLocalidade: r.scoreLocalidade,
             scoreFinal: r.scoreFinal,
@@ -82,6 +88,11 @@ async function executeTool(toolName, args) {
           tableId: args.tableId,
           slideIndex: primeira ? primeira.slideIndex : null,
           shapeId: primeira ? primeira.shapeId : null,
+          // Bounding box da tabela (todas as células compartilham).
+          left: primeira ? (primeira.left ?? null) : null,
+          top: primeira ? (primeira.top ?? null) : null,
+          width: primeira ? (primeira.width ?? null) : null,
+          height: primeira ? (primeira.height ?? null) : null,
           total: celulas.length,
           celulas: celulas.map((item) => ({
             id: item.id,
@@ -108,6 +119,11 @@ async function executeTool(toolName, args) {
             shapeName: r.item.shapeName,
             tipo: r.item.tipo,
             texto: r.item.texto,
+            left: r.item.left ?? null,
+            top: r.item.top ?? null,
+            width: r.item.width ?? null,
+            height: r.item.height ?? null,
+            rotation: r.item.rotation ?? null,
           })),
         };
         break;
@@ -248,6 +264,7 @@ export {
   buscarPorSimilaridade,
   buscarPorTabela,
   buscarPorIndice,
+  lerGeometria,
   substituirValor,
   medirTempoLeituraInicial,
   revalidarCacheIncremental,

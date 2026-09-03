@@ -7,6 +7,14 @@ Seu objetivo é localizar e substituir textos em slides de forma segura.
 2. **Um item por vez:** \`ppt_replace\` substitui um único item do cache; repita a chamada para vários itens.
 3. **Grupos e tabelas:** itens do tipo GroupChild exigem desagrupar/editar/reagrupar; itens Table usam linha/coluna.
 4. **Cache desatualizado:** se a escrita falhar com "não existe mais", rode \`ppt_revalidate\` e peça o id novamente.
+5. **Dois formatos de id:** \`id\` do cache (ex: "s0_85", "s0_85_r1c2") identifica o ITEM; \`shapeId\` (ex: "85") identifica a SHAPE no slide. As tools de mover/rotacionar/reordenar/duplicar/deletar/estrutura aceitam qualquer um dos dois.
+6. **Verifique destruição:** \`ppt_delete\` retorna \`removida\` (único) ou \`detalhes[]\` (lote) — se false, a shape NÃO foi deletada (id errado ou já removida). Confirme com busca antes de declarar sucesso.
+
+# Posicionamento (geometria)
+- Todo item do cache carrega \`left, top, width, height, rotation\` em **pontos** (origem no canto superior esquerdo do slide). Valores \`null\` = indisponível.
+- Itens Table (células) carregam a **bounding box da tabela toda** + sua posição \`row/column\`.
+- Use a geometria para: evitar sobreposição ao inserir (\`ppt_insert\`), alinhar/empilhar, e escolher \`left/top\` em \`ppt_move_resize\`.
+- O cache acompanha mover/rotacionar/inserir/deletar e mudanças em tabelas na hora; arrastar shapes no slide é capturado pelo \`ppt_revalidate\`.
 
 # Fluxo recomendado
 - \`ppt_list_content\` → \`ppt_search\` (termo) → mostrar top 5 com id/slide/texto → \`ppt_replace\` no id confirmado.
@@ -153,7 +161,10 @@ const POWERPOINT_TOOLS = [
         type: "object",
         properties: {
           slideIndex: { type: "number", description: "Índice 0-based do slide" },
-          shapeId: { type: "string", description: "Id da shape" },
+          shapeId: {
+            type: "string",
+            description: "Id da shape (numérico, ex: 85) ou id do item no cache (ex: s0_85)",
+          },
           left: { type: "number", description: "Nova posição X" },
           top: { type: "number", description: "Nova posição Y" },
           width: { type: "number", description: "Nova largura" },
@@ -172,7 +183,10 @@ const POWERPOINT_TOOLS = [
         type: "object",
         properties: {
           slideIndex: { type: "number", description: "Índice 0-based do slide" },
-          shapeId: { type: "string", description: "Id da shape" },
+          shapeId: {
+            type: "string",
+            description: "Id da shape (numérico, ex: 85) ou id do item no cache (ex: s0_85)",
+          },
           degrees: { type: "number", description: "Graus de rotação" },
         },
         required: ["slideIndex", "shapeId", "degrees"],
@@ -188,7 +202,10 @@ const POWERPOINT_TOOLS = [
         type: "object",
         properties: {
           slideIndex: { type: "number", description: "Índice 0-based do slide" },
-          shapeId: { type: "string", description: "Id da shape" },
+          shapeId: {
+            type: "string",
+            description: "Id da shape (numérico, ex: 85) ou id do item no cache (ex: s0_85)",
+          },
           order: {
             type: "string",
             description: "bringToFront, sendToBack, bringForward ou sendBackward",
@@ -208,7 +225,10 @@ const POWERPOINT_TOOLS = [
         type: "object",
         properties: {
           slideIndex: { type: "number", description: "Índice 0-based do slide" },
-          shapeId: { type: "string", description: "Id da shape original" },
+          shapeId: {
+            type: "string",
+            description: "Id da shape original (numérico) ou id do item no cache",
+          },
           offsetLeft: { type: "number", description: "Deslocamento X (padrão 20)" },
           offsetTop: { type: "number", description: "Deslocamento Y (padrão 20)" },
         },
@@ -225,7 +245,10 @@ const POWERPOINT_TOOLS = [
         type: "object",
         properties: {
           slideIndex: { type: "number", description: "Índice 0-based do slide (deleção única)" },
-          shapeId: { type: "string", description: "Id da shape (deleção única)" },
+          shapeId: {
+            type: "string",
+            description: "Id da shape ou id do item no cache (deleção única)",
+          },
           items: {
             type: "array",
             description: "Deleção em lote",
@@ -275,7 +298,11 @@ const POWERPOINT_TOOLS = [
         type: "object",
         properties: {
           slideIndex: { type: "number", description: "Índice 0-based do slide" },
-          shapeId: { type: "string", description: "Id da shape da tabela" },
+          shapeId: {
+            type: "string",
+            description:
+              "Id da shape da tabela (numérico) ou id de qualquer célula no cache (ex: s0_85_r1c2)",
+          },
           dimension: { type: "string", description: "rows ou columns" },
           action: { type: "string", description: "add, remove ou removeMany" },
           count: { type: "number", description: "Quantidade (add, padrão 1)" },
