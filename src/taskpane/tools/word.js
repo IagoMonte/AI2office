@@ -31,7 +31,28 @@ async function executeTool(toolName, args) {
         result = await formatSelection(args);
         break;
       case "find_replace":
-        result = await findReplace(args.find, args.replaceWith, args.matchCase);
+        result = await findReplace(args.find, args.replaceWith, args.matchCase, args.occurrence);
+        break;
+      case "list_tables":
+        result = await listTables();
+        break;
+      case "read_table":
+        result = await readTable(args.table);
+        break;
+      case "insert_table":
+        result = await insertTable(args.rows, args.columns, args.location, args.values);
+        break;
+      case "table_add_row":
+        result = await tableAddRow(args.table, args.count);
+        break;
+      case "table_add_column":
+        result = await tableAddColumn(args.table, args.count);
+        break;
+      case "write_table_cell":
+        result = await writeTableCell(args.table, args.row, args.column, args.text);
+        break;
+      case "delete_table":
+        result = await deleteTable(args.table);
         break;
       case "clear_content":
         result = await clearContent();
@@ -227,6 +248,209 @@ function formatSelection(format) {
 
       await context.sync();
       resolve("Formatação aplicada na seleção.");
+    }).catch(reject);
+  });
+}
+
+function isWordApi13Supported() {
+  try {
+    if (typeof Office !== "undefined" && Office.context && Office.context.requirements) {
+      return Office.context.requirements.isSetSupported("WordApi", "1.3");
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
+
+function requireTablesApi() {
+  if (!isWordApi13Supported()) {
+    throw new Error("Recursos de tabela/cabeçalho exigem Word API 1.3+.");
+  }
+}
+
+async function resolveTableIndex(context, table) {
+  const n = Math.floor(Number(table));
+  if (!Number.isFinite(n) || n < 1) {
+    throw new Error('Parâmetro "table" inválido: informe o número da tabela (1-based).');
+  }
+  const tables = context.document.body.tables;
+  tables.load("items");
+  await context.sync();
+  if (n > tables.items.length) {
+    throw new Error(`Tabela ${n} não existe: o documento tem ${tables.items.length} tabela(s).`);
+  }
+  return { tables: tables, item: tables.items[n - 1], index: n };
+}
+
+function listTables() {
+  return new Promise((resolve, reject) => {
+    Word.run(async (context) => {
+      requireTablesApi();
+      const tables = context.document.body.tables;
+      tables.load("items");
+      await context.sync();
+
+      const items = tables.items;
+      items.forEach((table) => table.load("rowCount,columnCount"));
+      await context.sync();
+
+      resolve({
+        totalTables: items.length,
+        tables: items.map((table, i) => ({
+          table: i + 1,
+          rows: table.rowCount,
+          columns: table.columnCount,
+        })),
+      });
+    }).catch(reject);
+  });
+}
+
+function readTable(table) {
+  return new Promise((resolve, reject) => {
+    Word.run(async (context) => {
+      requireTablesApi();
+      const resolved = await resolveTableIndex(context, table);
+      resolved.item.load("values,rowCount,columnCount");
+      await context.sync();
+
+      resolve({
+        table: resolved.index,
+        rows: resolved.item.rowCount,
+        columns: resolved.item.columnCount,
+        values: resolved.item.values,
+      });
+    }).catch(reject);
+  });
+}
+
+function insertTable(rows, columns, location, values) {
+  return new Promise((resolve, reject) => {
+    Word.run(async (context) => {
+      requireTablesApi();
+      const rowCount = Math.floor(Number(rows));
+      const columnCount = Math.floor(Number(columns));
+      if (
+        !Number.isFinite(rowCount) ||
+        rowCount < 1 ||
+        !Number.isFinite(columnCount) ||
+        columnCount < 1
+      ) {
+        throw new Error('Parâmetros "rows"/"columns" inválidos: informe inteiros >= 1.');
+      }
+      if (values !== undefined && values !== null && !Array.isArray(values)) {
+        throw new Error('Parâmetro "values" inválido: use matriz 2D (array de arrays) ou omita.');
+      }
+
+      const where = location === "start" ? "Start" : "End";
+      context.document.body.insertTable(rowCount, columnCount, where, values || undefined);
+      await context.sync();
+
+      const tables = context.document.body.tables;
+      tables.load("items");
+      await context.sync();
+
+      resolve({
+        table: tables.items.length,
+        rows: rowCount,
+        columns: columnCount,
+        location: location === "start" ? "início do documento" : "final do documento",
+      });
+    }).catch(reject);
+  });
+}
+
+function tableAddRow(table, count) {
+  return new Promise((resolve, reject) => {
+    Word.run(async (context) => {
+      requireTablesApi();
+      const resolved = await resolveTableIndex(context, table);
+      const qty = count === undefined || count === null ? 1 : Math.floor(Number(count));
+      if (!Number.isFinite(qty) || qty < 1) {
+        throw new Error('Parâmetro "count" inválido: informe inteiro >= 1.');
+      }
+      resolved.item.addRows(qty);
+      await context.sync();
+      resolved.item.load("rowCount,columnCount");
+      await context.sync();
+
+      resolve({
+        table: resolved.index,
+        addedRows: qty,
+        rows: resolved.item.rowCount,
+        columns: resolved.item.columnCount,
+      });
+    }).catch(reject);
+  });
+}
+
+function tableAddColumn(table, count) {
+  return new Promise((resolve, reject) => {
+    Word.run(async (context) => {
+      requireTablesApi();
+      const resolved = await resolveTableIndex(context, table);
+      const qty = count === undefined || count === null ? 1 : Math.floor(Number(count));
+      if (!Number.isFinite(qty) || qty < 1) {
+        throw new Error('Parâmetro "count" inválido: informe inteiro >= 1.');
+      }
+      resolved.item.addColumns(qty);
+      await context.sync();
+      resolved.item.load("rowCount,columnCount");
+      await context.sync();
+
+      resolve({
+        table: resolved.index,
+        addedColumns: qty,
+        rows: resolved.item.rowCount,
+        columns: resolved.item.columnCount,
+      });
+    }).catch(reject);
+  });
+}
+
+function writeTableCell(table, row, column, text) {
+  return new Promise((resolve, reject) => {
+    Word.run(async (context) => {
+      requireTablesApi();
+      const resolved = await resolveTableIndex(context, table);
+      resolved.item.load("values,rowCount,columnCount");
+      await context.sync();
+
+      const r = Math.floor(Number(row));
+      const c = Math.floor(Number(column));
+      if (
+        !Number.isFinite(r) ||
+        r < 1 ||
+        r > resolved.item.rowCount ||
+        !Number.isFinite(c) ||
+        c < 1 ||
+        c > resolved.item.columnCount
+      ) {
+        throw new Error(
+          `Célula inválida: tabela ${resolved.index} tem ${resolved.item.rowCount}x${resolved.item.columnCount}.`
+        );
+      }
+
+      const values = resolved.item.values.map((line) => line.slice());
+      values[r - 1][c - 1] = text === undefined || text === null ? "" : String(text);
+      resolved.item.values = values;
+      await context.sync();
+
+      resolve({ table: resolved.index, row: r, column: c });
+    }).catch(reject);
+  });
+}
+
+function deleteTable(table) {
+  return new Promise((resolve, reject) => {
+    Word.run(async (context) => {
+      requireTablesApi();
+      const resolved = await resolveTableIndex(context, table);
+      resolved.item.delete();
+      await context.sync();
+
+      resolve({ deleted: resolved.index });
     }).catch(reject);
   });
 }

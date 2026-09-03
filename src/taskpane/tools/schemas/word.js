@@ -198,6 +198,158 @@ const WORD_TOOLS = [
   {
     type: "function",
     function: {
+      name: "list_tables",
+      description:
+        "Lista as tabelas do corpo do documento com número (1-based), linhas e colunas de cada uma",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "read_table",
+      description: "Lê o conteúdo de uma tabela como matriz 2D de valores (linhas x colunas)",
+      parameters: {
+        type: "object",
+        properties: {
+          table: {
+            type: "number",
+            description: "Número da tabela (1-based, conforme list_tables)",
+          },
+        },
+        required: ["table"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "insert_table",
+      description: "Insere uma tabela nova no início ou no final do documento",
+      parameters: {
+        type: "object",
+        properties: {
+          rows: {
+            type: "number",
+            description: "Quantidade de linhas (>= 1)",
+          },
+          columns: {
+            type: "number",
+            description: "Quantidade de colunas (>= 1)",
+          },
+          location: {
+            type: "string",
+            enum: ["start", "end"],
+            description: "Onde inserir: início ou final do documento (padrão: end)",
+          },
+          values: {
+            type: "array",
+            description: "Matriz 2D opcional com o conteúdo inicial das células",
+            items: {
+              type: "array",
+              items: {},
+            },
+          },
+        },
+        required: ["rows", "columns"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "table_add_row",
+      description: "Adiciona linhas ao final de uma tabela",
+      parameters: {
+        type: "object",
+        properties: {
+          table: {
+            type: "number",
+            description: "Número da tabela (1-based)",
+          },
+          count: {
+            type: "number",
+            description: "Quantidade de linhas a adicionar (padrão: 1)",
+          },
+        },
+        required: ["table"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "table_add_column",
+      description: "Adiciona colunas ao final de uma tabela",
+      parameters: {
+        type: "object",
+        properties: {
+          table: {
+            type: "number",
+            description: "Número da tabela (1-based)",
+          },
+          count: {
+            type: "number",
+            description: "Quantidade de colunas a adicionar (padrão: 1)",
+          },
+        },
+        required: ["table"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "write_table_cell",
+      description: "Escreve texto em uma célula específica de uma tabela",
+      parameters: {
+        type: "object",
+        properties: {
+          table: {
+            type: "number",
+            description: "Número da tabela (1-based)",
+          },
+          row: {
+            type: "number",
+            description: "Número da linha (1-based)",
+          },
+          column: {
+            type: "number",
+            description: "Número da coluna (1-based)",
+          },
+          text: {
+            type: "string",
+            description: "Texto a escrever na célula",
+          },
+        },
+        required: ["table", "row", "column", "text"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "delete_table",
+      description: "Remove uma tabela do documento",
+      parameters: {
+        type: "object",
+        properties: {
+          table: {
+            type: "number",
+            description: "Número da tabela (1-based)",
+          },
+        },
+        required: ["table"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "clear_content",
       description: "Limpa todo o conteúdo do documento ativo",
       parameters: {
