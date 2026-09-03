@@ -1,5 +1,5 @@
 /* Fachada do PowerPoint: dispatcher de tools (uso futuro pelo agent.js)
- * + re-exports dos 4 módulos para a tela provisória de debug.
+ * + re-exports dos módulos para a tela provisória de debug.
  */
 
 import { getCache, setCache, clearCache } from "./cache.js";
@@ -16,6 +16,29 @@ import {
   buscarPorIndice,
 } from "./search.js";
 import { substituirValor } from "./writer.js";
+import {
+  inserirTextBox,
+  inserirForma,
+  inserirLinha,
+  moverRedimensionar,
+  rotacionar,
+  reordenar,
+  duplicarShape,
+  deletarShape,
+  deletarVarias,
+  ORDENS_Z,
+} from "./inserter.js";
+import {
+  isPowerPointApi19Supported,
+  criarTabela,
+  adicionarLinhas,
+  adicionarColunas,
+  removerLinha,
+  removerColuna,
+  removerVariasLinhas,
+  removerVariasColunas,
+  relerTabelaEAtualizaCache,
+} from "./tables.js";
 import {
   medirTempoLeituraInicial,
   revalidarCacheIncremental,
@@ -101,8 +124,92 @@ async function executeTool(toolName, args) {
         result = { totalItens: (await revalidarCacheIncremental()).length };
         break;
       case "ppt_api_support":
-        result = { api18: isPowerPointApi18Supported() };
+        result = { api18: isPowerPointApi18Supported(), api19: isPowerPointApi19Supported() };
         break;
+      case "ppt_insert": {
+        const pos = {
+          left: args.left,
+          top: args.top,
+          width: args.width,
+          height: args.height,
+        };
+        const kind = String(args.kind || "textbox").toLowerCase();
+        if (kind === "textbox") {
+          result = await inserirTextBox(args.slideIndex, args.text, pos);
+        } else if (kind === "shape") {
+          result = await inserirForma(args.slideIndex, args.shapeType, pos, args.text);
+        } else if (kind === "line") {
+          result = await inserirLinha(args.slideIndex, args.connectorType, pos);
+        } else {
+          throw new Error(
+            `Tipo de inserção desconhecido: ${args.kind}. Use textbox, shape ou line.`
+          );
+        }
+        break;
+      }
+      case "ppt_move_resize":
+        result = await moverRedimensionar(args.shapeId, args.slideIndex, {
+          left: args.left,
+          top: args.top,
+          width: args.width,
+          height: args.height,
+        });
+        break;
+      case "ppt_rotate":
+        result = await rotacionar(args.shapeId, args.slideIndex, args.degrees);
+        break;
+      case "ppt_reorder":
+        result = await reordenar(args.shapeId, args.slideIndex, args.order);
+        break;
+      case "ppt_duplicate":
+        result = await duplicarShape(args.shapeId, args.slideIndex, {
+          left: args.offsetLeft,
+          top: args.offsetTop,
+        });
+        break;
+      case "ppt_delete": {
+        const itens = Array.isArray(args.items)
+          ? args.items
+          : [{ slideIndex: args.slideIndex, shapeId: args.shapeId }];
+        result =
+          itens.length === 1
+            ? await deletarShape(itens[0].shapeId, itens[0].slideIndex)
+            : await deletarVarias(itens);
+        break;
+      }
+      case "ppt_create_table":
+        result = await criarTabela(args.slideIndex, args.rows, args.columns, {
+          left: args.left,
+          top: args.top,
+          values: args.values,
+        });
+        break;
+      case "ppt_table_structure": {
+        const dim = String(args.dimension || "rows").toLowerCase();
+        const action = String(args.action || "add").toLowerCase();
+        if (dim !== "rows" && dim !== "columns") {
+          throw new Error(`Dimensão desconhecida: ${args.dimension}. Use rows ou columns.`);
+        }
+        if (action === "add") {
+          result =
+            dim === "rows"
+              ? await adicionarLinhas(args.shapeId, args.slideIndex, args.count, args.index)
+              : await adicionarColunas(args.shapeId, args.slideIndex, args.count, args.index);
+        } else if (action === "remove") {
+          result =
+            dim === "rows"
+              ? await removerLinha(args.shapeId, args.slideIndex, args.index)
+              : await removerColuna(args.shapeId, args.slideIndex, args.index);
+        } else if (action === "removeMany") {
+          result =
+            dim === "rows"
+              ? await removerVariasLinhas(args.shapeId, args.slideIndex, args.indices)
+              : await removerVariasColunas(args.shapeId, args.slideIndex, args.indices);
+        } else {
+          throw new Error(`Ação desconhecida: ${args.action}. Use add, remove ou removeMany.`);
+        }
+        break;
+      }
       default:
         throw new Error("Ferramenta desconhecida: " + toolName);
     }
@@ -147,4 +254,23 @@ export {
   iniciarPolling,
   pararPolling,
   getPollingState,
+  inserirTextBox,
+  inserirForma,
+  inserirLinha,
+  moverRedimensionar,
+  rotacionar,
+  reordenar,
+  ORDENS_Z,
+  duplicarShape,
+  deletarShape,
+  deletarVarias,
+  isPowerPointApi19Supported,
+  criarTabela,
+  adicionarLinhas,
+  adicionarColunas,
+  removerLinha,
+  removerColuna,
+  removerVariasLinhas,
+  removerVariasColunas,
+  relerTabelaEAtualizaCache,
 };

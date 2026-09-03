@@ -19,6 +19,21 @@ import {
   iniciarPolling,
   pararPolling,
   getPollingState,
+  inserirTextBox,
+  inserirForma,
+  inserirLinha,
+  moverRedimensionar,
+  rotacionar,
+  reordenar,
+  duplicarShape,
+  deletarShape,
+  criarTabela,
+  adicionarLinhas,
+  adicionarColunas,
+  removerLinha,
+  removerColuna,
+  removerVariasLinhas,
+  removerVariasColunas,
 } from "./tools/powerpoint/index.js";
 
 function $(id) {
@@ -336,11 +351,229 @@ async function onRevalidar() {
   refreshStatus();
 }
 
+// --- Módulo 5 ---
+
+function numOuIndefinido(id) {
+  const el = $(id);
+  if (!el || String(el.value).trim() === "") return undefined;
+  const n = Number(el.value);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function lerShapeAlvo() {
+  const shapeId = (($("pptShapeId") || {}).value || "").trim();
+  const slideIndex = Number(($("pptShapeSlide") || {}).value || 0);
+  if (!shapeId) throw new Error("Informe o shapeId da shape (não o id do cache).");
+  return { shapeId, slideIndex };
+}
+
+async function onInserir() {
+  const slideIndex = Number(($("pptInsSlide") || {}).value || 0);
+  const kind = ($("pptInsKind") || {}).value || "textbox";
+  const pos = {
+    left: numOuIndefinido("pptInsLeft"),
+    top: numOuIndefinido("pptInsTop"),
+    width: numOuIndefinido("pptInsWidth"),
+    height: numOuIndefinido("pptInsHeight"),
+  };
+  try {
+    let ret;
+    if (kind === "shape") {
+      const tipoForma = (($("pptInsShapeType") || {}).value || "").trim();
+      ret = await inserirForma(slideIndex, tipoForma, pos, ($("pptInsText") || {}).value || "");
+    } else if (kind === "line") {
+      ret = await inserirLinha(slideIndex, ($("pptInsConnector") || {}).value || "Straight", pos);
+    } else {
+      ret = await inserirTextBox(slideIndex, ($("pptInsText") || {}).value || "", pos);
+    }
+    log(`M5: inserido ${kind} no slide ${slideIndex} → shapeId=${ret.shapeId} (cache atualizado)`);
+    setOut("pptShapeOut", ret);
+  } catch (e) {
+    log("M5 ERRO ao inserir: " + (e && e.message ? e.message : e), true);
+    setOut("pptShapeOut", "ERRO: " + ((e && e.message) || e));
+  }
+  refreshStatus();
+}
+
+async function onMover() {
+  try {
+    const { shapeId, slideIndex } = lerShapeAlvo();
+    const ret = await moverRedimensionar(shapeId, slideIndex, {
+      left: numOuIndefinido("pptMvLeft"),
+      top: numOuIndefinido("pptMvTop"),
+      width: numOuIndefinido("pptMvWidth"),
+      height: numOuIndefinido("pptMvHeight"),
+    });
+    log(`M5: shape ${shapeId} movida/redimensionada`);
+    setOut("pptShapeOut", ret);
+  } catch (e) {
+    log("M5 ERRO ao mover: " + (e && e.message ? e.message : e), true);
+    setOut("pptShapeOut", "ERRO: " + ((e && e.message) || e));
+  }
+  refreshStatus();
+}
+
+async function onRotacionar() {
+  try {
+    const { shapeId, slideIndex } = lerShapeAlvo();
+    const graus = Number(($("pptRotDeg") || {}).value);
+    const ret = await rotacionar(shapeId, slideIndex, graus);
+    log(`M5: shape ${shapeId} rotacionada ${graus}°`);
+    setOut("pptShapeOut", ret);
+  } catch (e) {
+    log("M5 ERRO ao rotacionar: " + (e && e.message ? e.message : e), true);
+    setOut("pptShapeOut", "ERRO: " + ((e && e.message) || e));
+  }
+  refreshStatus();
+}
+
+async function onReordenar() {
+  try {
+    const { shapeId, slideIndex } = lerShapeAlvo();
+    const ordem = ($("pptZOrder") || {}).value || "bringToFront";
+    const ret = await reordenar(shapeId, slideIndex, ordem);
+    log(`M5: shape ${shapeId} → ${ordem}`);
+    setOut("pptShapeOut", ret);
+  } catch (e) {
+    log("M5 ERRO ao reordenar: " + (e && e.message ? e.message : e), true);
+    setOut("pptShapeOut", "ERRO: " + ((e && e.message) || e));
+  }
+  refreshStatus();
+}
+
+async function onDuplicar() {
+  try {
+    const { shapeId, slideIndex } = lerShapeAlvo();
+    const ret = await duplicarShape(shapeId, slideIndex, {
+      left: numOuIndefinido("pptDupOffL"),
+      top: numOuIndefinido("pptDupOffT"),
+    });
+    log(`M5: shape ${shapeId} duplicada → shapeId=${ret.shapeId} (recriada como TextBox)`);
+    setOut("pptShapeOut", ret);
+  } catch (e) {
+    log("M5 ERRO ao duplicar: " + (e && e.message ? e.message : e), true);
+    setOut("pptShapeOut", "ERRO: " + ((e && e.message) || e));
+  }
+  refreshStatus();
+}
+
+async function onDeletar() {
+  try {
+    const { shapeId, slideIndex } = lerShapeAlvo();
+    if (typeof window !== "undefined" && window.confirm) {
+      if (!window.confirm(`Deletar a shape ${shapeId} do slide ${slideIndex}?`)) return;
+    }
+    const ret = await deletarShape(shapeId, slideIndex);
+    log(`M5: shape ${shapeId} ${ret.removida ? "deletada" : "já não existia"} (cache atualizado)`);
+    setOut("pptShapeOut", ret);
+  } catch (e) {
+    log("M5 ERRO ao deletar: " + (e && e.message ? e.message : e), true);
+    setOut("pptShapeOut", "ERRO: " + ((e && e.message) || e));
+  }
+  refreshStatus();
+}
+
+// --- Módulo 6 ---
+
+async function onCriarTabela() {
+  const slideIndex = Number(($("pptTblSlide") || {}).value || 0);
+  const linhas = Number(($("pptTblRows") || {}).value || 2);
+  const colunas = Number(($("pptTblCols") || {}).value || 2);
+  const rawValues = (($("pptTblValues") || {}).value || "").trim();
+  let values;
+  if (rawValues) {
+    try {
+      values = JSON.parse(rawValues);
+    } catch {
+      const msg = "M6 ERRO: values não é um JSON válido (array 2D de strings).";
+      log(msg, true);
+      setOut("pptTableOut", "ERRO: " + msg);
+      return;
+    }
+  }
+  try {
+    const ret = await criarTabela(slideIndex, linhas, colunas, {
+      left: numOuIndefinido("pptTblLeft"),
+      top: numOuIndefinido("pptTblTop"),
+      values,
+    });
+    log(
+      `M6: tabela criada no slide ${slideIndex} → shapeId=${ret.shapeId} (${linhas}x${colunas}, ${ret.celulas} célula(s) no cache)`
+    );
+    setOut("pptTableOut", ret);
+  } catch (e) {
+    log("M6 ERRO ao criar tabela: " + (e && e.message ? e.message : e), true);
+    setOut("pptTableOut", "ERRO: " + ((e && e.message) || e));
+  }
+  refreshStatus();
+}
+
+async function onEstruturaTabela() {
+  try {
+    const shapeId = (($("pptTblShapeId") || {}).value || "").trim();
+    const slideIndex = Number(($("pptTblStructSlide") || {}).value || 0);
+    if (!shapeId) throw new Error("Informe o shapeId da tabela.");
+    const dimensao = ($("pptTblDim") || {}).value || "rows";
+    const acao = ($("pptTblAction") || {}).value || "add";
+    const count = numOuIndefinido("pptTblCount") ?? 1;
+    const index = numOuIndefinido("pptTblIndex");
+    const indicesRaw = (($("pptTblIndices") || {}).value || "").trim();
+    const indices = indicesRaw
+      ? indicesRaw
+          .split(",")
+          .map((s) => Number(s.trim()))
+          .filter((n) => Number.isFinite(n))
+      : [];
+    const porLinha = dimensao === "rows";
+
+    let ret;
+    if (acao === "add") {
+      ret = porLinha
+        ? await adicionarLinhas(shapeId, slideIndex, count, index ?? null)
+        : await adicionarColunas(shapeId, slideIndex, count, index ?? null);
+    } else if (acao === "remove") {
+      if (index === undefined) throw new Error("Informe o índice da linha/coluna a remover.");
+      ret = porLinha
+        ? await removerLinha(shapeId, slideIndex, index)
+        : await removerColuna(shapeId, slideIndex, index);
+    } else {
+      if (!indices.length) throw new Error("Informe os índices separados por vírgula (ex: 0,2).");
+      ret = porLinha
+        ? await removerVariasLinhas(shapeId, slideIndex, indices)
+        : await removerVariasColunas(shapeId, slideIndex, indices);
+    }
+    log(`M6: tabela ${shapeId} — ${acao} ${dimensao} OK (${ret.celulas} célula(s) no cache)`);
+    setOut("pptTableOut", ret);
+  } catch (e) {
+    log("M6 ERRO: " + (e && e.message ? e.message : e), true);
+    setOut("pptTableOut", "ERRO: " + ((e && e.message) || e));
+  }
+  refreshStatus();
+}
+
+// --- Troca debug <-> chat ---
+
+function mostrarChat() {
+  const view = $("pptDebugView");
+  const chat = $("chatView");
+  if (view) view.classList.add("hidden");
+  if (chat) chat.classList.remove("hidden");
+  const voltar = $("btnChatGoPptDebug");
+  if (voltar) voltar.classList.remove("hidden");
+  log("Debug oculto — testando no chat. Volte com '🧪 Voltar ao debug PPT'.");
+}
+
 function initPptDebug() {
   const view = $("pptDebugView");
   const chat = $("chatView");
   if (view) view.classList.remove("hidden");
   if (chat) chat.classList.add("hidden");
+
+  if (initPptDebug.done) {
+    refreshStatus("tela provisória de debug");
+    return;
+  }
+  initPptDebug.done = true;
 
   if ($("btnPptRead")) $("btnPptRead").addEventListener("click", onLerTudo);
   if ($("btnPptSearch")) $("btnPptSearch").addEventListener("click", onBuscar);
@@ -351,6 +584,15 @@ function initPptDebug() {
   if ($("btnPptPollStart")) $("btnPptPollStart").addEventListener("click", onPollStart);
   if ($("btnPptPollStop")) $("btnPptPollStop").addEventListener("click", onPollStop);
   if ($("btnPptRevalidate")) $("btnPptRevalidate").addEventListener("click", onRevalidar);
+  if ($("btnPptInsert")) $("btnPptInsert").addEventListener("click", onInserir);
+  if ($("btnPptMove")) $("btnPptMove").addEventListener("click", onMover);
+  if ($("btnPptRotate")) $("btnPptRotate").addEventListener("click", onRotacionar);
+  if ($("btnPptReorder")) $("btnPptReorder").addEventListener("click", onReordenar);
+  if ($("btnPptDuplicate")) $("btnPptDuplicate").addEventListener("click", onDuplicar);
+  if ($("btnPptDelete")) $("btnPptDelete").addEventListener("click", onDeletar);
+  if ($("btnPptCreateTable")) $("btnPptCreateTable").addEventListener("click", onCriarTabela);
+  if ($("btnPptTableStruct")) $("btnPptTableStruct").addEventListener("click", onEstruturaTabela);
+  if ($("btnPptGoChat")) $("btnPptGoChat").addEventListener("click", mostrarChat);
   if ($("btnPptClearLog")) {
     $("btnPptClearLog").addEventListener("click", () => {
       if ($("pptLog")) $("pptLog").textContent = "";
@@ -410,4 +652,4 @@ function initPptDebug() {
   log("Debug PowerPoint pronto. Comece pelo Módulo 1 (Ler tudo).");
 }
 
-export { initPptDebug };
+export { initPptDebug, mostrarChat };

@@ -48,6 +48,7 @@ document.addEventListener("DOMContentLoaded", () => {
     typeof window !== "undefined" && /[?&]host=ppt/i.test(window.location.search || "");
   if (forcePpt) {
     initPptDebug();
+    mostrarBotaoDebugNoChat();
     return;
   }
 
@@ -55,14 +56,23 @@ document.addEventListener("DOMContentLoaded", () => {
     Office.onReady((info) => {
       if (info && info.host === Office.HostType.PowerPoint) {
         initPptDebug();
+        mostrarBotaoDebugNoChat();
       } else if (isPowerPointHost()) {
         initPptDebug();
+        mostrarBotaoDebugNoChat();
       }
     });
   } else if (isPowerPointHost()) {
     initPptDebug();
+    mostrarBotaoDebugNoChat();
   }
 });
+
+// Exibe no chat o botão de volta ao debug (só faz sentido no host PowerPoint).
+function mostrarBotaoDebugNoChat() {
+  const btn = document.getElementById("btnChatGoPptDebug");
+  if (btn) btn.classList.remove("hidden");
+}
 
 function initChat() {
   if (initChat.done) return;
@@ -80,6 +90,8 @@ function initChat() {
   document.getElementById("settingsForm").addEventListener("submit", saveSettings);
   document.getElementById("toggleKeyBtn").addEventListener("click", toggleKeyVisibility);
   document.getElementById("refreshModelsBtn").addEventListener("click", fetchModels);
+  const btnVoltarDebug = document.getElementById("btnChatGoPptDebug");
+  if (btnVoltarDebug) btnVoltarDebug.addEventListener("click", initPptDebug);
 
   const fileInput = document.getElementById("fileInput");
   document.getElementById("attachBtn").addEventListener("click", () => fileInput.click());
