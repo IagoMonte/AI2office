@@ -1,4 +1,54 @@
 const SELECTION_VALUES_CELL_LIMIT = 200;
+const VERIFY_CELL_LIMIT = 10000;
+
+function excelApiLevel() {
+  try {
+    if (typeof Office === "undefined" || !Office.context || !Office.context.requirements) {
+      return null;
+    }
+    let level = null;
+    for (let v = 1; v <= 17; v++) {
+      if (Office.context.requirements.isSetSupported("ExcelApi", "1." + v)) {
+        level = "1." + v;
+      }
+    }
+    return level;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeCell(value) {
+  if (value === null || value === undefined) {
+    return "";
+  }
+  return String(value);
+}
+
+function valuesEqual(expected, actual) {
+  if (!Array.isArray(expected) || !Array.isArray(actual) || expected.length !== actual.length) {
+    return false;
+  }
+  for (let r = 0; r < expected.length; r++) {
+    const expRow = expected[r] || [];
+    const actRow = actual[r] || [];
+    if (expRow.length !== actRow.length) {
+      return false;
+    }
+    for (let c = 0; c < expRow.length; c++) {
+      if (normalizeCell(expRow[c]) !== normalizeCell(actRow[c])) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+function containsFormula(values) {
+  return (values || []).some((line) =>
+    (line || []).some((cell) => typeof cell === "string" && cell.startsWith("="))
+  );
+}
 
 async function executeTool(toolName, args) {
   try {
@@ -15,6 +65,9 @@ async function executeTool(toolName, args) {
         break;
       case "clear_cells":
         result = await clearCells(args.range, args.sheet);
+        break;
+      case "get_range_info":
+        result = await getRangeInfo(args.range, args.sheet);
         break;
       case "resize_cells":
         result = await resizeCells(args.range, args.sheet, args);
@@ -59,9 +112,30 @@ function readCells(range, sheetName) {
 function writeCells(range, values, sheetName) {
   return new Promise((resolve, reject) => {
     Excel.run(async (context) => {
-      const rangeObj = resolveSheet(context, sheetName).getRange(range);
+      const sheet = resolveSheet(context, sheetName);
+      const rangeObj = sheet.getRange(range);
+      await assertWritableRange(context, sheet, rangeObj, rangeLabel(sheetName, range));
       rangeObj.values = values;
       await context.sync();
+
+      const rows = Array.isArray(values) ? values.length : 0;
+      const cols = rows && Array.isArray(values[0]) ? values[0].length : 0;
+      if (rows * cols > 0 && rows * cols <= VERIFY_CELL_LIMIT && !containsFormula(values)) {
+        const check = sheet.getRange(range);
+        check.load("values");
+        await context.sync();
+        if (!valuesEqual(values, check.values)) {
+          throw new Error(
+            "A escrita em " +
+              rangeLabel(sheetName, range) +
+              " foi aceita mas NÃO persistiu ao reler (lido: " +
+              JSON.stringify(check.values) +
+              "). " +
+              WRITE_PERSIST_HELP
+          );
+        }
+      }
+
       resolve("Valores escritos com sucesso em " + rangeLabel(sheetName, range));
     }).catch(reject);
   });
@@ -87,10 +161,124 @@ function formatCells(range, format, sheetName) {
 function clearCells(range, sheetName) {
   return new Promise((resolve, reject) => {
     Excel.run(async (context) => {
-      const rangeObj = resolveSheet(context, sheetName).getRange(range);
-      rangeObj.clear("Contents");
-      await context.sync();
+      const sheet = resolveSheet(context, sheetName);
+      const rangeObj = sheet.getRange(range);
+      await assertWritableRange(context, sheet, rangeObj, rangeLabel(sheetName, range));
+      try {
+        rangeObj.clear("Contents");
+        await context.sync();
+      } catch (error) {
+        throw new Error(
+          "Falha ao limpar " + rangeLabel(sheetName, range) + ": " + describeOfficeError(error)
+        );
+      }
+
+      const dims = await getRangeDims(context, sheet.getRange(range));
+      if (dims.rowCount * dims.columnCount <= VERIFY_CELL_LIMIT) {
+        const check = sheet.getRange(range);
+        check.load("values");
+        await context.sync();
+        const stillThere = (check.values || []).some((line) =>
+          (line || []).some((cell) => normalizeCell(cell) !== "")
+        );
+        if (stillThere) {
+          throw new Error(
+            "A limpeza de " +
+              rangeLabel(sheetName, range) +
+              " foi aceita mas o conteúdo persiste ao reler. " +
+              WRITE_PERSIST_HELP
+          );
+        }
+      }
+
       resolve("Células limpas: " + rangeLabel(sheetName, range));
+    }).catch(reject);
+  });
+}
+
+function describeOfficeError(error) {
+  const message = (error && error.message) || String(error);
+  if (/merged/i.test(message)) {
+    return (
+      message +
+      " (o intervalo toca células mescladas; escrita só fixa na célula superior-esquerda do merge)."
+    );
+  }
+  return message;
+}
+
+async function getRangeDims(context, rangeObj) {
+  rangeObj.load("address,rowCount,columnCount");
+  await context.sync();
+  return {
+    address: rangeObj.address,
+    rowCount: rangeObj.rowCount,
+    columnCount: rangeObj.columnCount,
+  };
+}
+
+async function readProtectionOrNull(context, sheet) {
+  try {
+    sheet.protection.load("protected");
+    await context.sync();
+    return !!sheet.protection.protected;
+  } catch {
+    return null;
+  }
+}
+
+// O Office.js NÃO expõe leitura de mesclagem (só merge()/unmerge() cegos):
+// escrita em célula não-superior-esquerda de um merge é descartada em
+// silêncio e a leitura retorna "". Como não dá para detectar via API,
+// a rede de segurança é a verificação pós-escrita em writeCells/clearCells.
+async function assertWritableRange(context, sheet, rangeObj, label) {
+  const protection = await readProtectionOrNull(context, sheet);
+  if (protection === true) {
+    throw new Error(
+      "A aba está protegida: desproteja (Revisar > Desproteger Planilha) ou peça ao usuário para desproteger antes de escrever em " +
+        label +
+        "."
+    );
+  }
+}
+
+const WRITE_PERSIST_HELP =
+  "Causas prováveis: (1) células mescladas — o Office.js não permite detectar merge via API, confira no Excel selecionando a célula e vendo o botão Mesclar; escrita só fixa na célula superior-esquerda do merge; " +
+  "(2) macro/evento VBA revertendo a edição (Alt+F11 para verificar); " +
+  "(3) edição concorrente. Verifique com get_range_info.";
+
+function getRangeInfo(range, sheetName) {
+  return new Promise((resolve, reject) => {
+    Excel.run(async (context) => {
+      const sheet = resolveSheet(context, sheetName);
+      const rangeObj = sheet.getRange(range);
+      const protection = await readProtectionOrNull(context, sheet);
+      const info = await getRangeDims(context, rangeObj);
+
+      let values = null;
+      let formulas = null;
+      let numberFormat = null;
+      if (info.rowCount * info.columnCount <= VERIFY_CELL_LIMIT) {
+        const probe = sheet.getRange(range);
+        probe.load("values,formulas,numberFormat");
+        await context.sync();
+        values = probe.values;
+        formulas = probe.formulas;
+        numberFormat = probe.numberFormat;
+      }
+
+      resolve({
+        range: rangeLabel(sheetName, range),
+        address: info.address,
+        rowCount: info.rowCount,
+        columnCount: info.columnCount,
+        mergeState: "unknown (o Office.js não expõe leitura de mesclagem; confira no Excel)",
+        sheetProtected: protection,
+        excelApi: excelApiLevel(),
+        values: values,
+        formulas: formulas,
+        numberFormat: numberFormat,
+      });
     }).catch(reject);
   });
 }
