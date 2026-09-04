@@ -11,6 +11,10 @@ import {
   executeTool as executePptTool,
   describeSelection as describePptSelection,
 } from "./tools/powerpoint/index.js";
+import {
+  executeTool as executeOutlookTool,
+  describeSelection as describeOutlookSelection,
+} from "./tools/outlook.js";
 import { requestJson } from "./http.js";
 import { getHistory, pushHistory, isBusy, setLoading } from "./state.js";
 import { getEndpoint, getApiKey, setSavedModel } from "./config.js";
@@ -43,6 +47,11 @@ function getActiveHost() {
         activeHost = "word";
       } else if (Office.context.host === Office.HostType.PowerPoint) {
         activeHost = "powerpoint";
+      } else if (
+        Office.context.host === Office.HostType.Outlook ||
+        (Office.context.mailbox && Office.context.mailbox.item)
+      ) {
+        activeHost = "outlook";
       } else {
         activeHost = "excel";
       }
@@ -59,6 +68,9 @@ function getToolModule() {
   }
   if (getActiveHost() === "powerpoint") {
     return { executeTool: executePptTool, describeSelection: describePptSelection };
+  }
+  if (getActiveHost() === "outlook") {
+    return { executeTool: executeOutlookTool, describeSelection: describeOutlookSelection };
   }
   return { executeTool: executeExcelTool, describeSelection: describeExcelSelection };
 }
