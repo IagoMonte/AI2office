@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "slug": "ai2office",
+  "title": { "pt": "AI2Office" },
+  "summary": {
+    "pt": "Painel de chat que permite ler, escrever e formatar documentos do Excel, Word, PowerPoint e Outlook em linguagem natural, usando qualquer API compatível com OpenAI."
+  },
+  "status": "dev",
+  "category": {
+    "slug": "ia",
+    "name": { "pt": "ia" },
+    "tagline": { "pt": "Modelos de linguagem aplicados a problemas reais, com ferramentas que agem sobre os dados." },
+    "colors": ["#0078d4", "#0b0b0b", "#005a9e"],
+    "fx": "network"
+  },
+  "stack": ["JavaScript", "Office.js", "Webpack", "Babel", "ESLint", "Prettier"],
+  "facts": {
+    "role": { "pt": "Desenvolvedor full stack" },
+    "period": { "start": "2026-08", "end": "atual" },
+    "context": { "pt": "projeto pessoal" }
+  },
+  "links": [
+    { "kind": "repo", "url": "https://github.com/IagoMonte/AI2office" }
+  ],
+  "thumbnail": "thumbnail.png",
+  "shots": [
+    { "file": "shots/01-chat-ferramentas.png", "caption": { "pt": "chat com ferramentas: consulta a planilha, escreve a fórmula e formata" }, "format": "mobile" },
+    { "file": "shots/02-configuracoes-api.png", "caption": { "pt": "configuração do endpoint e da chave de qualquer API compatível com OpenAI" }, "format": "mobile" }
+  ],
+  "docs": [
+    { "name": "README", "file": "docs/readme.md" },
+    { "name": "ARQUITETURA", "file": "docs/arquitetura.md" },
+    { "name": "CHANGELOG", "file": "docs/changelog.md" }
+  ]
+}
