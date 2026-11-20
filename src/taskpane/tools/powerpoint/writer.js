@@ -1,4 +1,3 @@
-/* Módulo 3 — Escrita (substituição de valor selecionado, 1 item por vez). */
 
 import { updateCacheItem, findCacheItem } from "./cache.js";
 import { lerConteudoDeTabela } from "./reader.js";
@@ -40,9 +39,8 @@ async function substituirValor(itemCache, novoTexto) {
 
       cell.text = textoFinal;
     } else if (alvo.tipo === "GroupChild") {
-      // Shape estava num grupo: precisa desagrupar, editar, reagrupar.
       await substituirDentroDeGrupo(context, slide, alvo, textoFinal);
-      return; // já sincroniza internamente
+      return;
     } else {
       const shape = slide.shapes.getItemOrNullObject(alvo.shapeId);
       await context.sync();
@@ -59,7 +57,6 @@ async function substituirValor(itemCache, novoTexto) {
     await context.sync();
   });
 
-  // Atualiza o cache local imediatamente, sem precisar reler.
   updateCacheItem(alvo.id, textoFinal);
   return { id: alvo.id, texto: textoFinal };
 }
@@ -84,10 +81,6 @@ async function substituirDentroDeGrupo(context, slide, itemCache, novoTexto) {
   filha.textFrame.textRange.text = novoTexto;
   await context.sync();
 
-  // Reagrupa todas as shapes visíveis no slide (limitação conhecida:
-  // sem a lista original de irmãos persistida, reagrupar por filtro amplo
-  // pode incluir shapes que não eram do grupo — por isso a tela de debug
-  // exibe o aviso e o checklist pede persistência da lista de irmãos).
   const idsParaReagrupar = slide.shapes.items.map((s) => s.id);
   slide.shapes.addGroup(idsParaReagrupar);
   await context.sync();

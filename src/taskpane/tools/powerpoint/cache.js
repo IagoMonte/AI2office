@@ -1,7 +1,3 @@
-/* Cache compartilhado dos 4 módulos do PowerPoint.
- * Válido apenas durante a sessão atual do documento aberto
- * (shape.id não é garantidamente estável entre sessões).
- */
 
 let cacheConteudo = [];
 
@@ -42,9 +38,6 @@ function findCacheItem(ref) {
   return null;
 }
 
-// Resolve a referência de shape aceitando tanto o id numérico da shape
-// (ex: "85") quanto o id do item no cache (ex: "s0_85", "s0_85_r1c2" —
-// neste caso usa o slideIndex/shapeId do próprio item).
 function resolverRefShape(refShapeId, slideIndex) {
   const texto = String(refShapeId === undefined || refShapeId === null ? "" : refShapeId);
   const item = findCacheItem({ id: texto });

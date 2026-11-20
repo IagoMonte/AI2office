@@ -17,8 +17,8 @@ O AI2office adiciona um painel de chat (task pane) aos aplicativos do Microsoft 
 |---|---|---|
 | Excel | ✅ Implementado | Leitura, escrita, formatação, limpeza, info da planilha, seleção atual |
 | Word | ✅ Implementado | Leitura, inserção, substituição de seleção, formatação, buscar/substituir, limpar documento, estatísticas, seleção atual |
-| PowerPoint | 🧪 Debug provisório | Leitura, busca, escrita (1 item), polling; tela de debug por módulo no lugar do chat |
-| Outlook | 🔜 Planejado | — |
+| PowerPoint | 🧪 Beta | Leitura, busca, escrita, formas e tabelas |
+| Outlook | ✅ Implementado | Leitura, escrita e composição de e-mails |
 
 ## Funcionalidades atuais (Excel)
 

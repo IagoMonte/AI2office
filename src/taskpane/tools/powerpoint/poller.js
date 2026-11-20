@@ -1,4 +1,3 @@
-/* Módulo 4 — Atualização via polling (adaptativo + incremental). */
 
 import { getCache, setCache } from "./cache.js";
 import { lerConteudoDeTabela, lerGeometria, temTextoSuportado } from "./reader.js";
@@ -23,7 +22,6 @@ async function medirTempoLeituraInicial(getAllContentFn) {
 }
 
 function calcularIntervaloPolling(tempoLeituraMs) {
-  // Regra: 20x o tempo de uma leitura completa, piso 5s, teto 60s.
   const intervaloSugerido = tempoLeituraMs * 20;
   return Math.min(Math.max(intervaloSugerido, 5000), 60000);
 }
@@ -88,8 +86,6 @@ async function revalidarCacheIncremental() {
         }
       }
 
-      // Shapes que continuam existindo: revalida texto e geometria
-      // (o usuário pode ter arrastado a shape no slide).
       for (const itemCacheado of itensCacheDoSlide) {
         if (
           idsAtuais.has(itemCacheado.shapeId) &&
@@ -145,7 +141,6 @@ async function iniciarPolling(getAllContentFn, onTick) {
     }
   }, intervalo);
 
-  // Complementa com o evento nativo quando disponível (Windows/web).
   try {
     if (
       Office.context &&
@@ -165,7 +160,6 @@ async function iniciarPolling(getAllContentFn, onTick) {
       );
     }
   } catch {
-    // Mac ou hosts sem o evento: polling por tempo cobre o buraco.
   }
 
   return intervalo;

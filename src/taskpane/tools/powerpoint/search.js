@@ -1,8 +1,3 @@
-/* Módulo 2 — Busca por similaridade e localidade (PowerPoint).
- * Implementação leve sem dependências externas (substitui Fuse.js nesta
- * fase de debug; API compatível para troca futura por Fuse com
- * threshold 0.4 / ignoreLocation).
- */
 
 function normalize(str) {
   return String(str || "")
@@ -11,7 +6,6 @@ function normalize(str) {
     .replace(/[\u0300-\u036f]/g, "");
 }
 
-// Distância de Levenshtein simples (limitada a strings curtas por performance).
 function levenshtein(a, b) {
   const s = normalize(a);
   const t = normalize(b);
@@ -38,14 +32,12 @@ function levenshtein(a, b) {
   return prev[t.length];
 }
 
-// Score 0..1: 1 = idêntico. Combina substring exata + similaridade por token.
 function scoreTexto(termo, texto) {
   const nTermo = normalize(termo).trim();
   const nTexto = normalize(texto);
   if (!nTermo) return 0;
   if (!nTexto) return 0;
   if (nTexto.includes(nTermo)) {
-    // Bônus para matches curtos e exatos.
     return 0.7 + 0.3 * (nTermo.length / Math.max(nTexto.length, nTermo.length));
   }
   const tokensTermo = nTermo.split(/\s+/);
@@ -62,7 +54,6 @@ function scoreTexto(termo, texto) {
     soma += melhor;
   }
   const media = soma / tokensTermo.length;
-  // Equivalente aproximado ao threshold 0.4 do Fuse: descarta < 0.4.
   return media >= 0.4 ? media * 0.85 : media * 0.5;
 }
 
@@ -85,10 +76,10 @@ function buscarCombinado(termo, cache, shapeReferencia, pesos) {
   const resultadosSimilaridade = buscarPorSimilaridade(termo, cache || []);
 
   const comScoreFinal = resultadosSimilaridade.map((r) => {
-    let scoreLocalidade = 0.5; // neutro se não houver referência de posição
+    let scoreLocalidade = 0.5;
     if (shapeReferencia) {
       const distancia = calcularDistanciaLocalidade(shapeReferencia, r.item);
-      scoreLocalidade = 1 / (1 + distancia); // 0–1, mais próximo = maior
+      scoreLocalidade = 1 / (1 + distancia);
     }
 
     const scoreFinal = r.scoreSimilaridade * p.similaridade + scoreLocalidade * p.localidade;
@@ -99,10 +90,6 @@ function buscarCombinado(termo, cache, shapeReferencia, pesos) {
   return comScoreFinal.sort((a, b) => b.scoreFinal - a.scoreFinal);
 }
 
-// Busca todos os itens de uma tabela pelo prefixo do id da shape
-// (ex: "s0_85" casa "s0_85_r0c0", "s0_85_r0c1"...). Se receber o id de
-// uma célula ("s0_85_r1c2"), remove o sufixo _rXcY e puxa a tabela toda.
-// Ordena por (row, column) para varredura linha a linha.
 function buscarPorTabela(prefixoOuId, cache) {
   const entrada = String(prefixoOuId || "").trim();
   if (!entrada) return [];
@@ -112,9 +99,6 @@ function buscarPorTabela(prefixoOuId, cache) {
     .sort((a, b) => a.row - b.row || a.column - b.column);
 }
 
-// Busca itens pela posição no cache: retorna a janela
-// [indice - raio, indice + raio], com clamp nos limites do array.
-// Cada resultado leva { index, item } para encadear com outras buscas.
 function buscarPorIndice(indice, cache, raio) {
   const lista = cache || [];
   const idx = Math.floor(Number(indice));

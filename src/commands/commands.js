@@ -1,10 +1,5 @@
-/*
- * Copyright (c) Microsoft Corporation. All rights reserved. Licensed under the MIT license.
- * See LICENSE in the project root for license information.
- */
 
 Office.onReady(() => {
-  // If needed, Office.js is ready to be called.
 });
 
 /**
@@ -19,15 +14,12 @@ function action(event) {
     persistent: true,
   };
 
-  // Show a notification message.
   Office.context.mailbox.item.notificationMessages.replaceAsync(
     "ActionPerformanceNotification",
     message
   );
 
-  // Be sure to indicate when the add-in command function is complete.
   event.completed();
 }
 
-// Register the function with Office.
 Office.actions.associate("action", action);

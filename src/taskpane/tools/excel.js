@@ -227,10 +227,6 @@ async function readProtectionOrNull(context, sheet) {
   }
 }
 
-// O Office.js NÃO expõe leitura de mesclagem (só merge()/unmerge() cegos):
-// escrita em célula não-superior-esquerda de um merge é descartada em
-// silêncio e a leitura retorna "". Como não dá para detectar via API,
-// a rede de segurança é a verificação pós-escrita em writeCells/clearCells.
 async function assertWritableRange(context, sheet, rangeObj, label) {
   const protection = await readProtectionOrNull(context, sheet);
   if (protection === true) {

@@ -1,8 +1,6 @@
 const MAX_BODY_CHARS = 8000;
 const MAX_SUBJECT_CHARS = 500;
 
-// Cache volátil da última leitura (revalidação anti-perda, sem polling).
-// Descartado a cada nova conversa via clearOutlookCache().
 let lastReadBody = null;
 let lastReadSubject = null;
 
@@ -239,7 +237,6 @@ function ensureMessage(item, acao) {
 }
 
 async function revalidarRascunho() {
-  // Proteção contra sobrescrever edição manual do usuário entre leitura e escrita.
   if (lastReadBody !== null) {
     const atual = await obterCorpoHtml();
     if (atual !== lastReadBody) {

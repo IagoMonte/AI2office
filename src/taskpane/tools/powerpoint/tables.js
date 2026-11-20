@@ -1,8 +1,3 @@
-/* Módulo 6 — Manipulação de tabelas.
- * Criar tabela nova (addTable, API 1.8), adicionar/remover
- * linhas e colunas (API 1.9). Após qualquer mudança estrutural,
- * relê só aquela tabela para manter o cache consistente.
- */
 
 import { getCache, setCache, resolverRefShape } from "./cache.js";
 import { lerConteudoDeTabela, isPowerPointApi18Supported } from "./reader.js";
@@ -72,8 +67,6 @@ async function relerTabelaEAtualizaCache(shapeId, slideIndex) {
   return novosItens;
 }
 
-// --- 6.1 Criar tabela nova ---
-
 async function criarTabela(slideIndex, numLinhas, numColunas, posicao = {}) {
   if (!isPowerPointApi18Supported()) {
     throw new Error("Criar tabela (addTable) exige PowerPoint API 1.8+.");
@@ -103,7 +96,6 @@ async function criarTabela(slideIndex, numLinhas, numColunas, posicao = {}) {
     shapeId = shape.id;
     shapeName = shape.name;
 
-    // Já popula o cache com as células (vazias ou do values), sem polling.
     novosItens = await lerConteudoDeTabela(context, shape, {
       slideIndex: idx,
       slideId: slide.id,
@@ -125,8 +117,6 @@ async function criarTabela(slideIndex, numLinhas, numColunas, posicao = {}) {
   };
 }
 
-// --- 6.2 Adicionar linhas/colunas ---
-
 async function adicionarLinhas(shapeId, slideIndex, quantidade = 1, indice = null) {
   if (!isPowerPointApi19Supported()) {
     throw new Error("Adicionar linhas exige PowerPoint API 1.9+.");
@@ -141,7 +131,6 @@ async function adicionarLinhas(shapeId, slideIndex, quantidade = 1, indice = nul
     const table = shape.getTable();
     table.rows.load("count");
     await context.sync();
-    // Sem índice = adiciona no fim (posição = contagem atual).
     const pos =
       indice === null || indice === undefined ? table.rows.count : Math.floor(Number(indice));
     table.rows.add(pos, qtd);
@@ -185,8 +174,6 @@ async function adicionarColunas(shapeId, slideIndex, quantidade = 1, indice = nu
     celulas: novosItens.length,
   };
 }
-
-// --- 6.3 Remover linhas/colunas ---
 
 async function removerLinha(shapeId, slideIndex, indiceLinha) {
   if (!isPowerPointApi19Supported()) {
@@ -253,8 +240,6 @@ async function removerVariasLinhas(shapeId, slideIndex, indices) {
     const table = shape.getTable();
     table.rows.load("items");
     await context.sync();
-    // Opera sobre referências reais (não posições), então remover em
-    // lote não desloca os índices das demais.
     const alvos = lista.map((i) => table.rows.items[i]).filter(Boolean);
     if (!alvos.length) throw new Error("Nenhuma das linhas existe na tabela.");
     table.rows.deleteRows(alvos);

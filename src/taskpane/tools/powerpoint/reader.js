@@ -1,20 +1,9 @@
-/* Módulo 1 — Leitura e disponibilização de conteúdo (PowerPoint).
- * Lê shapes normais, tabelas e shapes dentro de grupos.
- * Segunda fase de carga: geometria (left, top, width, height, rotation)
- * para noção de posicionamento — células de tabela carregam a
- * bounding box da tabela + row/column.
- * Requer PowerPoint API 1.8+ para ungroup()/addGroup().
- */
 
 import { setCache } from "./cache.js";
 
 let lastReadErrors = [];
 let lastReadSkipped = [];
 
-// Tipos de shape que nunca têm textFrame (confirmado via debug:
-// Image e Line lançam InvalidArgument ao acessar textFrame).
-// Chart/Diagram/Media entram por segurança — se o nome do enum não
-// bater, o try/catch por shape continua capturando.
 const SHAPES_SEM_TEXTO = ["Image", "Line", "Chart", "Diagram", "Media", "Ink", "OleObject"];
 
 function getLastReadErrors() {
@@ -33,9 +22,6 @@ function erroMsg(e) {
   return (e && e.message ? e.message : String(e)) + (e && e.code ? ` [${e.code}]` : "");
 }
 
-// Segunda fase de carga do Módulo 1: geometria da shape (pontos,
-// origem no canto superior esquerdo do slide). Nunca pode quebrar
-// a leitura do texto — em caso de falha retorna tudo null.
 async function lerGeometria(context, shape) {
   const vazia = { left: null, top: null, width: null, height: null, rotation: null };
   try {
@@ -55,8 +41,6 @@ async function lerGeometria(context, shape) {
 
 function isPowerPointApi18Supported() {
   try {
-    // O nome correto do requirement set é "PowerPointApi" ("PowerPoint"
-    // sozinho não é um set válido e isSetSupported retorna false).
     return Office.context.requirements.isSetSupported("PowerPointApi", "1.8");
   } catch {
     return false;
@@ -69,8 +53,6 @@ async function lerConteudoDeTabela(context, shape, base) {
   table.load("rowCount, columnCount");
   await context.sync();
 
-  // Geometria da tabela toda (cada célula carrega a bounding box da
-  // tabela + sua posição row/column — suficiente para posicionamento).
   const geoTabela = await lerGeometria(context, shape);
 
   for (let r = 0; r < table.rowCount; r++) {
@@ -79,7 +61,6 @@ async function lerConteudoDeTabela(context, shape, base) {
         const cell = table.getCellOrNullObject(r, c);
         cell.load("text");
         await context.sync();
-        // Células mescladas/encobertas retornam NullObject: pular sem erro.
         if (cell.isNullObject) {
           continue;
         }
@@ -112,7 +93,6 @@ async function lerConteudoDeGrupo(context, slide, grupoShape, slideIdx) {
   const idGrupoOriginal = grupoShape.id;
   const nomeGrupoOriginal = grupoShape.name;
 
-  // Requer PowerPoint API 1.8+.
   grupoShape.group.ungroup();
   await context.sync();
 
@@ -120,12 +100,8 @@ async function lerConteudoDeGrupo(context, slide, grupoShape, slideIdx) {
   await context.sync();
 
   const itens = [];
-  // Heurística: tudo que não tem o nome do grupo original são (prováveis) filhas.
-  // A lista de IDs é persistida implicitamente via parentGroupId + shapeId.
   const shapesFilhas = slide.shapes.items.filter((s) => s.name !== nomeGrupoOriginal);
 
-  // O finally garante o reagrupamento mesmo se a leitura de uma filha falhar,
-  // para não deixar a apresentação desfeita no meio do debug.
   let reagrupado = false;
   try {
     for (const filha of shapesFilhas) {
@@ -174,7 +150,6 @@ async function lerConteudoDeGrupo(context, slide, grupoShape, slideIdx) {
       }
     }
   } finally {
-    // Reagrupa para preservar a estrutura visual original.
     if (!reagrupado) {
       try {
         const idsParaReagrupar = shapesFilhas.map((s) => s.id);
@@ -184,7 +159,6 @@ async function lerConteudoDeGrupo(context, slide, grupoShape, slideIdx) {
         }
         reagrupado = true;
       } catch {
-        // Mantém o erro original da leitura; o reagrupamento falhou junto.
       }
     }
   }
@@ -202,7 +176,6 @@ async function getAllContent(onProgress) {
       try {
         onProgress(info);
       } catch {
-        // Progresso é só log de debug; nunca pode quebrar a leitura.
       }
     }
   };
@@ -231,9 +204,6 @@ async function getAllContent(onProgress) {
           tipo: shape.type,
         };
 
-        // Uma shape problemática (gráfico, SmartArt, mídia...) não pode
-        // derrubar a leitura da apresentação inteira: registra e segue.
-        // Tipos sabidamente sem textFrame nem passam pelo load.
         try {
           if (!temTextoSuportado(shape.type) && shape.type !== "Table" && shape.type !== "Group") {
             lastReadSkipped.push({
@@ -247,7 +217,6 @@ async function getAllContent(onProgress) {
           }
           if (shape.type === "Group") {
             if (!isPowerPointApi18Supported()) {
-              // Sem API 1.8 não há como ler dentro do grupo: registra placeholder para debug.
               const geoGrupo = await lerGeometria(context, shape);
               resultado.push({
                 id: `s${slideIdx}_${shape.id}_grupo-nao-suportado`,
@@ -271,7 +240,6 @@ async function getAllContent(onProgress) {
             if (shape.textFrame.hasText) {
               shape.textFrame.textRange.load("text");
               await context.sync();
-              // Segunda fase de carga: geometria para noção de posicionamento.
               const geo = await lerGeometria(context, shape);
               resultado.push({
                 id: `s${slideIdx}_${shape.id}`,

@@ -1,10 +1,3 @@
-/* Módulo 5 — Inserção de conteúdo e manipulação de shapes.
- * Inserção (addTextBox/addGeometricShape/addLine, API 1.4),
- * mover/redimensionar/rotacionar (1.4), reordenar/z-order (1.8),
- * duplicar (recriação com offset) e deletar (1.4, idempotente).
- * Toda operação bem-sucedida atualiza o cache na hora,
- * sem depender do polling do Módulo 4.
- */
 
 import { getCache, setCache, resolverRefShape } from "./cache.js";
 import { isPowerPointApi18Supported, temTextoSuportado } from "./reader.js";
@@ -62,8 +55,6 @@ async function resolverShape(context, slideIndex, shapeId) {
   }
   return { slide, shape };
 }
-
-// --- 5.1 Inserção ---
 
 async function inserirTextBox(slideIndex, texto, posicao = {}) {
   const idx = validarSlideIndex(slideIndex);
@@ -180,8 +171,6 @@ async function inserirLinha(slideIndex, tipoConector = "Straight", posicao = {})
     const slide = slides.items[idx];
     if (!slide) throw new Error(`Slide ${idx} não existe.`);
 
-    // Em linhas, width/height são o deslocamento do ponto final
-    // relativo ao inicial (ex: width 200 + height 0 = linha deitada de 200pt).
     const shape = slide.shapes.addLine(enumConector, {
       left: numOu(posicao.left, 50),
       top: numOu(posicao.top, 50),
@@ -194,12 +183,8 @@ async function inserirLinha(slideIndex, tipoConector = "Straight", posicao = {})
     shapeName = shape.name;
   });
 
-  // Linha não tem texto: não entra no cache de conteúdo, mas o id
-  // retornado permite mover/deletar depois.
   return { shapeId, shapeName, slideIndex: idx };
 }
-
-// --- 5.2 Manipulação ---
 
 async function moverRedimensionar(shapeId, slideIndex, novaPosicao = {}) {
   const alvo = resolverRefShape(shapeId, slideIndex);
@@ -221,7 +206,6 @@ async function moverRedimensionar(shapeId, slideIndex, novaPosicao = {}) {
     await context.sync();
     final = { left: shape.left, top: shape.top, width: shape.width, height: shape.height };
   });
-  // Cache acompanha a nova posição imediatamente.
   const itemMovido = getCache().find(
     (c) => c.slideIndex === idx && String(c.shapeId) === String(sid)
   );
@@ -303,9 +287,6 @@ async function duplicarShape(shapeId, slideIndex, offset = {}) {
       }
     }
 
-    // Limitação conhecida: a duplicação recria como TextBox, preservando
-    // posição (+offset), tamanho, rotação e texto — mas não preenchimento,
-    // contorno nem o tipo geométrico original.
     const copia = slide.shapes.addTextBox(textoOriginal, {
       left: original.left + offLeft,
       top: original.top + offTop,
@@ -359,7 +340,7 @@ async function deletarShape(shapeId, slideIndex) {
     if (!slide) throw new Error(`Slide ${idx} não existe mais.`);
     const shape = slide.shapes.getItemOrNullObject(sid);
     await context.sync();
-    if (shape.isNullObject) return; // idempotente: já foi deletada
+    if (shape.isNullObject) return;
     shape.delete();
     await context.sync();
     removida = true;
@@ -372,7 +353,6 @@ async function deletarShape(shapeId, slideIndex) {
 async function deletarVarias(itens) {
   const lista = Array.isArray(itens) ? itens : [];
   if (!lista.length) throw new Error("Lista vazia: informe ao menos um {slideIndex, shapeId}.");
-  // Aceita shapeId numérico ou id do cache em cada item.
   const normalizados = lista.map((i) => {
     const alvo = resolverRefShape(i.shapeId, i.slideIndex);
     return { slideIndex: alvo.slideIndex, shapeId: alvo.shapeId };

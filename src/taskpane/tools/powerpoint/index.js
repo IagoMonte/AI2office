@@ -1,4 +1,3 @@
-/* Fachada do PowerPoint: dispatcher de tools usado pelo agent.js. */
 
 import { getCache, setCache, clearCache } from "./cache.js";
 import {
@@ -86,7 +85,6 @@ async function executeTool(toolName, args) {
           tableId: args.tableId,
           slideIndex: primeira ? primeira.slideIndex : null,
           shapeId: primeira ? primeira.shapeId : null,
-          // Bounding box da tabela (todas as células compartilham).
           left: primeira ? (primeira.left ?? null) : null,
           top: primeira ? (primeira.top ?? null) : null,
           width: primeira ? (primeira.width ?? null) : null,

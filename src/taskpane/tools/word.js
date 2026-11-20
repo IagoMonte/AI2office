@@ -733,8 +733,6 @@ function writeTableCell(table, row, column, text, location) {
         );
       }
 
-      // Escrita cirúrgica na célula (getCell é 0-based): não reescreve a
-      // matriz inteira, preservando a formatação das demais células.
       const cell = resolved.item.getCell(r - 1, c - 1);
       cell.value = text === undefined || text === null ? "" : String(text);
       await context.sync();
